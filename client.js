@@ -176,6 +176,25 @@ window.__ModuleLoader__.load({
   --wb-dim:var(--dsw-alias-label-secondary,#61666b);
   --wb-dim2:var(--dsw-alias-label-tertiary,#81858c);
   --wb-acc:#fb7299; --wb-green:#22c55e; --wb-blue:#3b82f6; --wb-gray:#9aa0a6; --wb-amber:#f59e0b; --wb-red:#ef4444;
+  /* 强调色当文字用时必须更深：品牌粉 #fb7299 直接当字色只有 2.5:1，只保留给填充/边框/进度条 */
+  --wb-acc-text:#b02a5b; --wb-acc-text:light-dark(#b02a5b,#ffabcb);
+  /* 标签色板：chip/tier/badge/cmt/创作风格选中态共用，只在这里改色，别在各规则里另写一处。
+     取向参考 B站：低饱和浅底、无描边、4px 圆角，状态只靠底色+文字色区分。 */
+  --wb-tag-worth-bg:#eaf7ef; --wb-tag-worth-bg:light-dark(#eaf7ef,#14301f);
+  --wb-tag-worth-fg:#15703a; --wb-tag-worth-fg:light-dark(#15703a,#70e0a2);
+  --wb-tag-worth-bd:#c9e9d6; --wb-tag-worth-bd:light-dark(#c9e9d6,#2b5540);
+  --wb-tag-ok-bg:#ecf2fe; --wb-tag-ok-bg:light-dark(#ecf2fe,#152a48);
+  --wb-tag-ok-fg:#1b4bac; --wb-tag-ok-fg:light-dark(#1b4bac,#9dc0ff);
+  --wb-tag-ok-bd:#cbdaf7; --wb-tag-ok-bd:light-dark(#cbdaf7,#31507d);
+  --wb-tag-skip-bg:#f1f2f3; --wb-tag-skip-bg:light-dark(#f1f2f3,#2a2e33);
+  --wb-tag-skip-fg:#5b6166; --wb-tag-skip-fg:light-dark(#5b6166,#b6bbc2);
+  --wb-tag-skip-bd:#dcdee0; --wb-tag-skip-bd:light-dark(#dcdee0,#3d4248);
+  --wb-tag-warn-bg:#fdf3e5; --wb-tag-warn-bg:light-dark(#fdf3e5,#382a13);
+  --wb-tag-warn-fg:#8a5107; --wb-tag-warn-fg:light-dark(#8a5107,#ffce7a);
+  --wb-tag-warn-bd:#f0dcbd; --wb-tag-warn-bd:light-dark(#f0dcbd,#6b5028);
+  --wb-tag-sel-bg:#fff0f4; --wb-tag-sel-bg:light-dark(#fff0f4,#3d1c29);
+  --wb-tag-sel-fg:var(--wb-acc-text);
+  --wb-tag-sel-bd:#f7c6d8; --wb-tag-sel-bd:light-dark(#f7c6d8,#79405a);
   --wb-rail:color-mix(in srgb,var(--dsw-alias-label-primary,#0f1115) 3%,var(--dsw-alias-bg-base,#fff));
   --wb-shadow:0 1px 2px rgba(15,17,21,.04);
   display:flex;height:calc(100vh - 76px);max-height:calc(100vh - 76px);min-height:480px;position:relative;overflow:hidden;
@@ -190,11 +209,11 @@ window.__ModuleLoader__.load({
 [data-wb-nav]{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;margin-bottom:2px;border:0;border-radius:9px;
   background:transparent;color:var(--wb-dim);font:inherit;text-align:left;cursor:pointer;position:relative;white-space:nowrap;}
 [data-wb-nav]:hover{background:var(--wb-card2);color:var(--wb-tx);}
-[data-wb-nav][aria-selected="true"]{background:rgba(251,114,153,.12);color:var(--wb-acc);font-weight:700;}
+[data-wb-nav][aria-selected="true"]{background:rgba(251,114,153,.12);color:var(--wb-acc-text);font-weight:700;}
 [data-wb-nav][aria-selected="true"]::before{content:"";position:absolute;left:-10px;top:9px;bottom:9px;width:3px;border-radius:3px;background:var(--wb-acc);}
 [data-wb-nav] .ico{font-size:15px;width:18px;text-align:center;flex:none;}
 [data-wb-nav] [data-wb-label]{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-[data-wb-nav] .badge{margin-left:auto;font-size:10px;padding:0 6px;border-radius:999px;background:var(--wb-acc);color:#fff;}
+[data-wb-nav] .badge{margin-left:auto;font-size:10px;padding:0 6px;border-radius:999px;background:#c2255c;color:#fff;}
 [data-wb-rail-foot]{margin-top:auto;padding:8px 4px 0;border-top:1px solid var(--wb-line);}
 [data-wb-ghost]{width:100%;padding:7px;border-radius:8px;border:1px solid var(--wb-line);background:transparent;color:var(--wb-dim);font:inherit;cursor:pointer;}
 [data-wb-ghost]:hover{background:var(--wb-card2);color:var(--wb-tx);}
@@ -217,19 +236,16 @@ window.__ModuleLoader__.load({
 [data-wb-btn][data-primary]{background:var(--wb-acc);border-color:var(--wb-acc);color:#fff;font-weight:600;}
 [data-wb-btn][data-sm]{padding:4px 10px;font-size:12px;}
 [data-wb-btn][disabled]{opacity:.45;cursor:not-allowed;}
-[data-wb-chip]{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:2px 9px;border-radius:999px;border:1px solid var(--wb-line);color:var(--wb-dim);white-space:nowrap;}
-[data-wb-chip][data-sel]{background:rgba(251,114,153,.16);border-color:rgba(251,114,153,.55);color:var(--wb-acc);font-weight:600;}
-[data-wb-chip][data-ok]{color:#15803d;color:light-dark(#15803d,#4ade80);border-color:rgba(34,197,94,.45);}
-[data-wb-chip][data-warn]{color:#b45309;color:light-dark(#b45309,#fbbf24);border-color:rgba(245,158,11,.45);}
-[data-wb-tier]{font-size:11px;padding:2px 9px;border-radius:999px;font-weight:700;white-space:nowrap;display:inline-block;border:1px solid;}
-[data-wb-tier="值得看"]{background:rgba(34,197,94,.16);color:#15803d;color:light-dark(#15803d,#4ade80);border-color:rgba(34,197,94,.45);}
-[data-wb-tier="可以看"]{background:rgba(251,114,153,.16);color:#1d4ed8;color:light-dark(#1d4ed8,#7aa7ff);border-color:rgba(251,114,153,.45);}
-[data-wb-tier="跳过"]{background:rgba(154,160,166,.14);color:#5b6166;color:light-dark(#5b6166,#9aa0a6);border-color:rgba(154,160,166,.35);}
-[data-wb-tier][data-tone="worth"], [data-wb-badge][data-tone="worth"]{background:rgba(34,197,94,.16);color:#15803d;color:light-dark(#15803d,#4ade80);border-color:rgba(34,197,94,.45);}
-[data-wb-tier][data-tone="ok"], [data-wb-badge][data-tone="ok"]{background:rgba(251,114,153,.16);color:#1d4ed8;color:light-dark(#1d4ed8,#7aa7ff);border-color:rgba(251,114,153,.45);}
-[data-wb-tier][data-tone="skip"], [data-wb-badge][data-tone="skip"]{background:rgba(154,160,166,.14);color:#5b6166;color:light-dark(#5b6166,#9aa0a6);border-color:rgba(154,160,166,.35);}
-[data-wb-badge]{font-size:11px;padding:2px 9px;border-radius:999px;border:1px solid var(--wb-line);background:var(--wb-card2);color:var(--wb-dim);white-space:nowrap;}
-[data-wb-cmt]{font-size:11px;padding:2px 8px;border-radius:999px;background:rgba(245,158,11,.14);color:#b45309;color:light-dark(#b45309,#fbbf24);border:1px solid rgba(245,158,11,.4);white-space:nowrap;flex:none;}
+/* 四种标签共用一套外形：12px、4px 圆角、无描边、低饱和浅底，状态只靠底色+文字色区分。
+   中性态也上灰底（B站 的灰底标签），不再用彩色描边；半透明底会随宿主表面和照片漂移，一律不用。 */
+[data-wb-chip],[data-wb-tier],[data-wb-badge],[data-wb-cmt]{display:inline-flex;align-items:center;gap:4px;font-size:12px;line-height:1.6;padding:1px 7px;border:0;border-radius:4px;white-space:nowrap;background:var(--wb-tag-skip-bg);color:var(--wb-tag-skip-fg);}
+[data-wb-cmt]{background:var(--wb-tag-warn-bg);color:var(--wb-tag-warn-fg);flex:none;}
+[data-wb-chip][data-sel]{background:var(--wb-tag-sel-bg);color:var(--wb-tag-sel-fg);}
+[data-wb-chip][data-ok]{background:var(--wb-tag-worth-bg);color:var(--wb-tag-worth-fg);}
+[data-wb-chip][data-warn]{background:var(--wb-tag-warn-bg);color:var(--wb-tag-warn-fg);}
+[data-wb-tier="值得看"],[data-wb-tier][data-tone="worth"],[data-wb-badge][data-tone="worth"]{background:var(--wb-tag-worth-bg);color:var(--wb-tag-worth-fg);}
+[data-wb-tier="可以看"],[data-wb-tier][data-tone="ok"],[data-wb-badge][data-tone="ok"]{background:var(--wb-tag-ok-bg);color:var(--wb-tag-ok-fg);}
+[data-wb-tier="跳过"],[data-wb-tier][data-tone="skip"],[data-wb-badge][data-tone="skip"]{background:var(--wb-tag-skip-bg);color:var(--wb-tag-skip-fg);}
 [data-wb-input]{width:100%;box-sizing:border-box;padding:8px 10px;border-radius:9px;font-size:12px;border:1px solid var(--wb-line);background:var(--wb-card2);color:var(--wb-tx);font-family:inherit;}
 [data-wb-input]:focus{outline:none;border-color:var(--wb-acc);}
 [data-wb-input][data-area]{resize:vertical;min-height:64px;line-height:19px;}
@@ -252,6 +268,9 @@ window.__ModuleLoader__.load({
 [data-wb-okmsg]{font-size:12px;line-height:18px;padding:8px 10px;border-radius:9px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.28);color:#15803d;color:light-dark(#15803d,#4ade80);}
 [data-wb-loading]{font-size:12px;color:var(--wb-dim2);}
 [data-wb-grid]{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));}
+[data-wb-group]{display:flex;flex-direction:column;gap:8px}
+[data-wb-grouphead]{display:flex;align-items:center;gap:8px}
+[data-wb-groupcount]{font-size:12px;color:var(--wb-dim2)}
 [data-wb-card]{display:flex;flex-direction:column;overflow:hidden;border-radius:13px;border:1px solid var(--wb-line);background:var(--wb-card);box-shadow:var(--wb-shadow);min-width:0;}
 [data-wb-card]:hover{border-color:rgba(251,114,153,.45);}
 [data-wb-cover]{position:relative;aspect-ratio:16/9;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:11px;color:rgba(255,255,255,.85);font-family:ui-monospace,Consolas,monospace;background:linear-gradient(135deg,#4c6ef5,#845ef7 55%,#0ca678);}
@@ -305,6 +324,13 @@ window.__ModuleLoader__.load({
 [data-wb-brand] small{font-size:11px;margin-top:7px}
 [data-wb-nav]{border-radius:6px;padding:11px 10px;font-size:13px;font-weight:500}
 [data-wb-nav] .ico{display:flex;align-items:center;justify-content:center;width:20px}
+/* 实测：图标墨迹中心比中文字形中心高约 0.56px，且六个图标高度从 13.3 到 16.7px 不等。
+   统一下移半像素 + 按图标归一化到同一光学高度；non-scaling-stroke 让缩放不改变描边粗细。 */
+[data-wb-nav] .ico{transform:translateY(.5px)}
+[data-wb-nav] .ico path{transform-box:fill-box;transform-origin:center;vector-effect:non-scaling-stroke;stroke-width:1.33}
+[data-wb-nav] .ico svg[data-i="store"] path{transform:scale(1.21)}
+[data-wb-nav] .ico svg[data-i="scroll"] path,[data-wb-nav] .ico svg[data-i="create"] path{transform:scale(1.06)}
+[data-wb-nav] .ico svg[data-i="review"] path,[data-wb-nav] .ico svg[data-i="settings"] path,[data-wb-nav] .ico svg[data-i="mine"] path{transform:scale(.94)}
 [data-wb-nav][aria-selected="true"]{font-weight:600;background:rgba(251,114,153,.1)}
 [data-wb-nav][aria-selected="true"]::before{display:none}
 [data-wb-main]{padding:26px 28px 36px;background:color-mix(in srgb,var(--wb-tx) 2%,var(--wb-bg))}
@@ -335,24 +361,27 @@ window.__ModuleLoader__.load({
 [data-wb-empty-ico] svg{width:42px;height:42px;stroke-width:1}
 [data-wb-style]{display:flex;gap:8px;flex-wrap:wrap}
 [data-wb-style] button{flex:1 1 140px;text-align:left;white-space:normal;padding:11px 13px}
-[data-wb-style] button[data-primary]{color:var(--wb-acc);background:rgba(251,114,153,.08);font-weight:400}
-[data-wb-style] button[data-primary]:hover:not(:disabled){background:rgba(251,114,153,.14)}
+[data-wb-style] button[data-primary]{color:var(--wb-tag-sel-fg);background:var(--wb-tag-sel-bg);border-color:var(--wb-tag-sel-bd);font-weight:400}
+[data-wb-style] button[data-primary]:hover:not(:disabled){background:var(--wb-tag-sel-bg);border-color:var(--wb-tag-sel-fg)}
 [data-wb-style] [data-wb-note]{font-size:11px;margin-top:4px}
 [data-wb-edit]{border-top:1px solid var(--wb-line);padding-top:12px}
 [data-wb-task-history]>summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--wb-dim)}
 [data-wb-task-history][open]>summary{margin-bottom:4px}
 [data-wb-edit]>summary{cursor:pointer;color:var(--wb-dim);font-size:13px;width:fit-content;padding:4px 0}
-[data-wb-edit][open]>summary{color:var(--wb-acc);margin-bottom:14px}
+[data-wb-edit][open]>summary{color:var(--wb-acc-text);margin-bottom:14px}
+[data-wb-fold]>summary{cursor:pointer;width:fit-content;padding:4px 0;font-size:12px;color:var(--wb-dim);list-style:none}
+[data-wb-fold]>summary::-webkit-details-marker{display:none}
+[data-wb-fold]>summary::before{content:"▸ "}
+[data-wb-fold][open]>summary::before{content:"▾ "}
+[data-wb-fold][open]>summary{margin-bottom:2px;color:var(--wb-acc-text)}
 [data-wb-edit] [data-wb-col]{gap:14px}
 [data-wb-shots]{max-height:65px;overflow:auto}
 @media(max-width:820px){[data-wb-main]{padding:18px 14px}[data-wb-sec]{padding:16px}[data-wb-rail]{width:62px}}
 @media(prefers-reduced-motion:reduce){[data-wb-root] *{transition:none!important;scroll-behavior:auto!important}}
 
-/* 状态标签必须独立于封面明暗可读，不能继承低对比度灰字。 */
-[data-wb-cover] [data-wb-badge]{background:#202735;color:#fff;border:1px solid rgba(255,255,255,.45);font-size:12px;font-weight:600;padding:4px 8px;line-height:1.5;box-shadow:0 1px 4px rgba(0,0,0,.25)}
-[data-wb-cover] [data-wb-badge][data-tone="worth"]{background:#176343;color:#fff;border-color:#72c6a0}
-[data-wb-cover] [data-wb-badge][data-tone="ok"]{background:#245a91;color:#fff;border-color:#86b8eb}
-[data-wb-cover] [data-wb-badge][data-tone="skip"]{background:#764814;color:#fff;border-color:#edbb7d}
+/* 封面标签与卡片内标签共用同一套色板和外形，只额外加投影：浅底压在白封面上靠一圈淡描边保住边界。
+   底板必须不透明 —— 半透明底会随照片明暗漂移，真实封面实测最差 1.02:1。 */
+[data-wb-cover] [data-wb-badge],[data-wb-cover] [data-wb-tier]{box-shadow:0 0 0 1px rgba(15,17,21,.1),0 1px 3px rgba(0,0,0,.28)}
 
 /* 紧凑方案列表：标题、元信息、内容与操作各占一行。 */
 [data-wb-project-card]{gap:10px;padding:18px 20px;border-radius:7px}
@@ -410,7 +439,7 @@ window.__ModuleLoader__.load({
 [data-wb-select-menu] [role=option][aria-disabled=true]{opacity:.4;cursor:not-allowed}
 [data-wb-style] [role=radio]{display:flex;align-items:center;gap:7px}
 [data-wb-style] [role=radio]::before{content:"";width:12px;height:12px;border:1px solid var(--wb-dim2);border-radius:50%;flex:none}
-[data-wb-style] [role=radio][aria-checked=true]::before{border:4px solid var(--wb-acc);background:var(--wb-bg)}
+[data-wb-style] [role=radio][aria-checked=true]::before{border:4px solid var(--wb-tag-sel-fg);background:var(--wb-bg)}
 `
 
     /* ── 小组件 ── */
@@ -423,7 +452,7 @@ window.__ModuleLoader__.load({
       mine: 'M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0 M4 21v-2a8 8 0 0 1 16 0v2',
       empty: 'M4 5h16v15H4z M8 10h8 M8 14h5',
     }
-    const Icon = ({ name = 'empty' }) => h('svg', { width: 20, height: 20, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.6, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true }, h('path', { d: ICON_PATHS[name] || ICON_PATHS.empty }))
+    const Icon = ({ name = 'empty' }) => h('svg', { 'data-i': name, width: 20, height: 20, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.6, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true }, h('path', { d: ICON_PATHS[name] || ICON_PATHS.empty }))
     const Btn = ({ primary, sm, children, ...rest }) => h('button', {
       ...rest, 'data-wb-btn': '', 'data-primary': primary ? '' : undefined, 'data-sm': sm ? '' : undefined,
     }, children)
@@ -517,6 +546,16 @@ window.__ModuleLoader__.load({
       title ? h('div', { 'data-wb-h': '' }, title) : null, children)
     const Err = ({ children }) => children ? h('div', { 'data-wb-err': '' }, children) : null
     const OkMsg = ({ children }) => children ? h('div', { 'data-wb-okmsg': '' }, children) : null
+    /** 长列表折叠：超过 limit 条就把其余收进原生 details，和「高级设置」是同一套折叠形态 */
+    const Fold = ({ limit = 5, unit = '条', children }) => {
+      const items = (Array.isArray(children) ? children : [children]).filter(Boolean)
+      if (items.length <= limit) return h('div', { style: { display: 'contents' } }, ...items)
+      return h('div', { style: { display: 'contents' } },
+        ...items.slice(0, limit),
+        h('details', { 'data-wb-fold': '' },
+          h('summary', {}, `展开其余 ${items.length - limit} ${unit}`),
+          ...items.slice(limit)))
+    }
 
     /* ═══════════════════ ① 素材库 ═══════════════════ */
     function StoreRow({ r, onDetail }) {
@@ -1474,6 +1513,55 @@ window.__ModuleLoader__.load({
       const publishEnabled = Boolean(list.data?.publishEnabled)
       usePoll(list.reload, 5000, true)
 
+      /* 按状态分段展示：一段一个状态，段头带状态标签和条数，避免不同阶段混在同一个网格里 */
+      const STAGE_ORDER = ['rendered', 'approved', 'uploading', 'upload_unknown', 'submitted', 'published', 'platform_rejected', 'rejected', 'failed', 'scripted', 'draft']
+      const stageKey = (r) => (r.stage || 'draft')
+      const sections = STAGE_ORDER.map((s) => ({ stage: s, items: visibleRuns.filter((r) => stageKey(r) === s) })).filter((g) => g.items.length)
+      const strayRuns = visibleRuns.filter((r) => !STAGE_ORDER.includes(stageKey(r)))
+      const sectionEl = (stage, items) => h('div', { key: stage, 'data-wb-group': '' },
+        h('div', { 'data-wb-grouphead': '' },
+          h('span', { 'data-wb-badge': '', 'data-tone': stageOf(stage)[1] }, stageOf(stage)[0]),
+          h('span', { 'data-wb-groupcount': '' }, items.length + ' 个')),
+        h('div', { 'data-wb-grid': '' }, ...items.map(runCard)))
+
+      const runCard = (r) => {
+        const [label, tone] = stageOf(r.stage)
+        const published = Boolean(r.bvid || r.upload?.bvid || ['submitted', 'published', 'platform_rejected', 'uploading', 'upload_unknown'].includes(r.stage) || r.review?.state === 'published')
+        return h('div', { key: r.runId, 'data-wb-card': '' },
+          h('div', { 'data-wb-cover': '' },
+            h('span', {}, published ? (r.stage === 'published' ? '平台已发布成片' : stageOf(r.stage)[0]) : r.stage === 'rendered' ? '待审成片' : r.title || r.runId),
+            r.hasCover ? h('img', { src: `/api/bili-wb/review/media?runId=${encodeURIComponent(r.runId)}&kind=cover`, alt: '', loading: 'lazy', onError: (e) => { e.target.style.display = 'none' } }) : null,
+            h('span', { 'data-wb-badge': '', 'data-tone': tone, style: { position: 'absolute', left: '8px', top: '8px', zIndex: 2 } }, label),
+            h('span', { 'data-wb-dur': '' }, r.seconds ? `${Math.round(r.seconds)}s` : '')),
+          h('div', { 'data-wb-body': '' },
+            h('div', { 'data-wb-cardtitle': '' }, r.title || r.runId),
+            h('div', { 'data-wb-meta': '' }, [r.projectVersion ? `v${r.projectVersion}` : '', r.shots ? `${r.shots} 镜` : '', r.realFrames ? `真实帧 ${r.realFrames}` : '', r.builtAt ? dayOf(r.builtAt) : ''].filter(Boolean).join(' · ')),
+            h('div', { 'data-wb-row': '' },
+              published
+                ? h(Btn, { sm: true, primary: true, disabled: Boolean(busy) || !(r.bvid || r.upload?.bvid), onClick: () => showStats(r) }, '看数据')
+                : h(Btn, { sm: true, primary: true, disabled: Boolean(busy) || !r.hasVideo || r.stage === 'approved', onClick: () => decide(r.runId, 'approved') }, '本地审核通过'),
+              published ? null : h(Btn, { sm: true, disabled: Boolean(busy) || !r.hasVideo, onClick: () => decide(r.runId, 'rejected') }, '打回重做'),
+              h('div', { 'data-wb-grow': '' }),
+              h(Btn, { sm: true, disabled: !r.hasVideo, onClick: () => setPreview(`/api/bili-wb/review/media?runId=${encodeURIComponent(r.runId)}&kind=video`) }, '预览'),
+              h(Btn, {
+                sm: true, disabled: Boolean(busy), onClick: () => remove(r),
+                style: delArm === r.runId ? { color: '#f87171', borderColor: 'rgba(248,113,113,.5)' } : undefined,
+              }, busy === r.runId + 'del' ? '删除中…' : delArm === r.runId ? '确认删除？' : '删除成片')),
+            h('div', { 'data-wb-row': '' },
+              h(Btn, { sm: true, disabled: Boolean(busy) || !r.hasVideo || r.stage === 'uploading', onClick: () => upload(r, true) }, '投稿检查'),
+              r.stage === 'approved'
+                ? h(Btn, { sm: true, disabled: Boolean(busy) || !publishEnabled || !r.hasVideo, onClick: () => upload(r, false) }, '提交投稿')
+                : null,
+              h('div', { 'data-wb-grow': '' }),
+              published ? h(Btn, { sm: true, disabled: Boolean(busy) || r.stage === 'uploading', onClick: () => syncPublication(r) }, '同步平台状态') : null,
+              r.stage === 'upload_unknown' ? h(Btn, { sm: true, disabled: Boolean(busy), onClick: () => allowRetry(r) }, '确认未投稿后重试') : null,
+              r.review?.state ? h('span', { 'data-wb-meta': '' }, '本地审核：' + (r.review.state === 'approved' ? '已通过' : r.review.state === 'rejected' ? '已打回' : r.review.state === 'published' ? '历史投稿记录待核对' : r.review.state)) : null),
+            r.upload?.platformDescription ? h(Note, {}, '平台：' + r.upload.platformDescription + (r.upload.private ? ' · 仅自己可见' : '')) : null,
+            r.upload?.rejectReason ? h(Err, {}, String(r.upload.rejectReason)) : null,
+            r.stage === 'approved' && r.upload?.error ? h(Err, {}, '投稿未提交：' + r.upload.error) : null,
+            r.stage === 'upload_unknown' ? h(Err, {}, '上次投稿结果未确认，请先核对创作中心或同步BV，避免重复投稿。') : null))
+      }
+
       const decide = async (runId, state) => {
         setBusy(runId + state)
         const r = await jpost('/review/decision', { runId, state })
@@ -1550,43 +1638,8 @@ window.__ModuleLoader__.load({
           ...[['all', '全部'], ['pending', '待本地审核'], ['approved', '待投稿'], ['submitted', '投稿记录']].map(([key, name]) =>
             h(Btn, { key, sm: true, primary: filter === key, 'aria-pressed': filter === key, onClick: () => setFilter(key) }, name + ' ' + runs.filter(groups[key]).length))),
         !list.loading && runs.length > 0 && !visibleRuns.length ? h(Empty, { title: '此状态暂无成片', hint: '可以切换其他状态查看。' }) : null,
-        h('div', { 'data-wb-grid': '' }, ...visibleRuns.map((r) => {
-          const [label, tone] = stageOf(r.stage)
-          const published = Boolean(r.bvid || r.upload?.bvid || ['submitted', 'published', 'platform_rejected', 'uploading', 'upload_unknown'].includes(r.stage) || r.review?.state === 'published')
-          return h('div', { key: r.runId, 'data-wb-card': '' },
-            h('div', { 'data-wb-cover': '' },
-              h('span', {}, published ? (r.stage === 'published' ? '平台已发布成片' : stageOf(r.stage)[0]) : r.stage === 'rendered' ? '待审成片' : r.title || r.runId),
-              r.hasCover ? h('img', { src: `/api/bili-wb/review/media?runId=${encodeURIComponent(r.runId)}&kind=cover`, alt: '', loading: 'lazy', onError: (e) => { e.target.style.display = 'none' } }) : null,
-              h('span', { 'data-wb-badge': '', 'data-tone': tone, style: { position: 'absolute', left: '8px', top: '8px', zIndex: 2 } }, label),
-              h('span', { 'data-wb-dur': '' }, r.seconds ? `${Math.round(r.seconds)}s` : '')),
-            h('div', { 'data-wb-body': '' },
-              h('div', { 'data-wb-cardtitle': '' }, r.title || r.runId),
-              h('div', { 'data-wb-meta': '' }, [r.projectVersion ? `v${r.projectVersion}` : '', r.shots ? `${r.shots} 镜` : '', r.realFrames ? `真实帧 ${r.realFrames}` : '', r.builtAt ? dayOf(r.builtAt) : ''].filter(Boolean).join(' · ')),
-              h('div', { 'data-wb-row': '' },
-                published
-                  ? h(Btn, { sm: true, primary: true, disabled: Boolean(busy) || !(r.bvid || r.upload?.bvid), onClick: () => showStats(r) }, '看数据')
-                  : h(Btn, { sm: true, primary: true, disabled: Boolean(busy) || !r.hasVideo || r.stage === 'approved', onClick: () => decide(r.runId, 'approved') }, '本地审核通过'),
-                published ? null : h(Btn, { sm: true, disabled: Boolean(busy) || !r.hasVideo, onClick: () => decide(r.runId, 'rejected') }, '打回重做'),
-                h('div', { 'data-wb-grow': '' }),
-                h(Btn, { sm: true, disabled: !r.hasVideo, onClick: () => setPreview(`/api/bili-wb/review/media?runId=${encodeURIComponent(r.runId)}&kind=video`) }, '预览'),
-                h(Btn, {
-                  sm: true, disabled: Boolean(busy), onClick: () => remove(r),
-                  style: delArm === r.runId ? { color: '#f87171', borderColor: 'rgba(248,113,113,.5)' } : undefined,
-                }, busy === r.runId + 'del' ? '删除中…' : delArm === r.runId ? '确认删除？' : '删除成片')),
-              h('div', { 'data-wb-row': '' },
-                h(Btn, { sm: true, disabled: Boolean(busy) || !r.hasVideo || r.stage === 'uploading', onClick: () => upload(r, true) }, '投稿检查'),
-                r.stage === 'approved'
-                  ? h(Btn, { sm: true, disabled: Boolean(busy) || !publishEnabled || !r.hasVideo, onClick: () => upload(r, false) }, '提交投稿')
-                  : null,
-                h('div', { 'data-wb-grow': '' }),
-                published ? h(Btn, { sm: true, disabled: Boolean(busy) || r.stage === 'uploading', onClick: () => syncPublication(r) }, '同步平台状态') : null,
-                r.stage === 'upload_unknown' ? h(Btn, { sm: true, disabled: Boolean(busy), onClick: () => allowRetry(r) }, '确认未投稿后重试') : null,
-                r.review?.state ? h('span', { 'data-wb-meta': '' }, '本地审核：' + (r.review.state === 'approved' ? '已通过' : r.review.state === 'rejected' ? '已打回' : r.review.state === 'published' ? '历史投稿记录待核对' : r.review.state)) : null),
-              r.upload?.platformDescription ? h(Note, {}, '平台：' + r.upload.platformDescription + (r.upload.private ? ' · 仅自己可见' : '')) : null,
-              r.upload?.rejectReason ? h(Err, {}, String(r.upload.rejectReason)) : null,
-              r.stage === 'approved' && r.upload?.error ? h(Err, {}, '投稿未提交：' + r.upload.error) : null,
-              r.stage === 'upload_unknown' ? h(Err, {}, '上次投稿结果未确认，请先核对创作中心或同步BV，避免重复投稿。') : null))
-        })),
+        ...sections.map((g) => sectionEl(g.stage, g.items)),
+        strayRuns.length ? sectionEl('未知状态', strayRuns) : null,
         preview ? h('div', { 'data-wb-overlay': '', role: 'dialog', 'aria-modal': true, 'aria-label': '成片预览', onClick: e => { if (e.target === e.currentTarget) setPreview('') } },
           h('button', { className: 'x', 'aria-label': '关闭预览（Esc）', onClick: () => setPreview('') }, '✕'),
           h('video', { src: preview, controls: true, autoPlay: true })) : null)
@@ -1640,6 +1693,16 @@ window.__ModuleLoader__.load({
 
       const col = (key, title, hint) => {
         const t = data?.[key]
+        const entryEls = (t?.entries || []).map((e, i) => h('div', {
+          key: i, 'data-wb-row': '',
+          style: e.blocked ? { color: '#ef4444', borderBottom: '1px dashed #ef4444', padding: '2px 0' } : { borderBottom: '1px solid rgba(128,128,128,.2)', padding: '2px 0' },
+          title: e.blocked ? `已屏蔽：${e.blockedWhy}（磁盘原文保留）` : `${e.source || ''} ${e.at ? '· ' + e.at.slice(0, 10) : ''}`,
+        },
+        h('span', { style: { flex: '1', minWidth: '0' } }, e.blocked ? `⛔ ${e.text}` : e.text),
+        h('button', {
+          'data-wb-ghost': '', style: { width: 'auto', border: 'none', background: 'none', cursor: 'pointer', color: '#999' },
+          title: '删除这条', onClick: () => op({ target: key, action: 'remove', old_text: e.text }, '已删'),
+        }, '×')))
         return h('div', { 'data-wb-col': '', style: { minWidth: '0' } },
           h('div', { 'data-wb-row': '' },
             h('b', {}, title),
@@ -1665,16 +1728,7 @@ window.__ModuleLoader__.load({
               onClick: async () => { const v = inputs[key].trim(); await op({ target: key, action: 'add', content: v }, '已记下'); setInputs({ ...inputs, [key]: '' }) },
             }, '记一条')),
           h('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
-            (t?.entries || []).map((e, i) => h('div', {
-              key: i, 'data-wb-row': '',
-              style: e.blocked ? { color: '#ef4444', borderBottom: '1px dashed #ef4444', padding: '2px 0' } : { borderBottom: '1px solid rgba(128,128,128,.2)', padding: '2px 0' },
-              title: e.blocked ? `已屏蔽：${e.blockedWhy}（磁盘原文保留）` : `${e.source || ''} ${e.at ? '· ' + e.at.slice(0, 10) : ''}`,
-            },
-            h('span', { style: { flex: '1', minWidth: '0' } }, e.blocked ? `⛔ ${e.text}` : e.text),
-            h('button', {
-              'data-wb-ghost': '', style: { border: 'none', background: 'none', cursor: 'pointer', color: '#999' },
-              title: '删除这条', onClick: () => op({ target: key, action: 'remove', old_text: e.text }, '已删'),
-            }, '×')))),
+            h(Fold, { limit: 5, unit: '条' }, entryEls)),
           !t?.entries?.length && !t?.error ? h(Note, {}, '（空）') : null)
       }
 
@@ -1698,13 +1752,14 @@ window.__ModuleLoader__.load({
             h(Chip, {}, Object.entries(events.types || {}).map(([t, n]) => `${evIcon[t] || '·'}${n}`).join(' ') || '还没有')),
           h(Note, {}, '咕嘎自动记录：看过什么、出过什么方案、渲染/审核/评论结果。出方案和写评论时会按题材把相关经历想起来；保留 90 天 / 上限条数。')),
         h('div', { style: { display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '4px' } },
-          (events.recent || []).map((e, i) => h('div', {
-            key: i, 'data-wb-row': '', style: { borderBottom: '1px solid rgba(128,128,128,.15)', padding: '2px 0' },
-            title: `${e.at} · ${e.type}`,
-          },
-          h('span', { style: { marginRight: '6px' } }, evIcon[e.type] || '·'),
-          h('span', { 'data-wb-grow': '', style: { minWidth: '0' } }, String(e.text || '').slice(0, 70)),
-          h('span', { style: { color: '#999', fontSize: '12px' } }, String(e.at || '').slice(5, 10))))),
+          h(Fold, { limit: 5, unit: '条' },
+            (events.recent || []).map((e, i) => h('div', {
+              key: i, 'data-wb-row': '', style: { borderBottom: '1px solid rgba(128,128,128,.15)', padding: '2px 0' },
+              title: `${e.at} · ${e.type}`,
+            },
+            h('span', { style: { marginRight: '6px' } }, evIcon[e.type] || '·'),
+            h('span', { 'data-wb-grow': '', style: { minWidth: '0' } }, String(e.text || '').slice(0, 70)),
+            h('span', { style: { color: '#999', fontSize: '12px' } }, String(e.at || '').slice(5, 10)))))),
         !events.recent?.length ? h(Note, {}, '（还没有经历，刷几条 B站 或出一个方案就有了）') : null,
         /* ── 复盘（M2）：从经历里提炼跨次有效的偏好 ── */
         h('div', { 'data-wb-row': '', style: { marginTop: '8px' } },

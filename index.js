@@ -1336,6 +1336,7 @@ export function apply(ctx) {
       const dryRun = body.dryRun === true
       const args = []
       if (dryRun) args.push('--dry-run')
+      let dmTo = ''
       if (kind === 'comment') {
         const bv = String(body.bv || '').trim()
         if (!BV_RE.test(bv)) return sendJson(res, 200, { ok: false, error: 'BV 号不对' })
@@ -1349,16 +1350,16 @@ export function apply(ctx) {
         if (body.root) args.push('--root', String(body.root))
         if (cfg.mentionName) args.push('--at', cfg.mentionName)
       } else {
-        const uid = String(body.uid || cfg.dmUid || '').trim()
-        if (!uid) return sendJson(res, 200, { ok: false, error: '没填私信对象 UID' })
-        args.push('dm', 'send', uid, text)
+        dmTo = String(body.uid || cfg.dmOwnerUid || '').trim()
+        if (!dmTo) return sendJson(res, 200, { ok: false, error: '没填私信对象 UID' })
+        args.push('dm', 'send', dmTo, text)
       }
 
       const r = await runBili(args, { timeoutMs: 60000 })
       if (r.ok && !dryRun) {
         if (kind === 'comment') await interact.markComment(body.bv, { text })
         if (kind === 'reply') await interact.markReply(body.rpid, { text })
-        if (kind === 'dm') await interact.markDm(body.uid || cfg.dmUid, { text })
+        if (kind === 'dm') await interact.markDm(dmTo, { text })
         const what = kind === 'comment' ? '评论了' : kind === 'reply' ? '回复了' : '私信了'
         memory.addEvent(kind === 'dm' ? 'dm' : kind, {
           bv: body.bv || '', text: `${what}《${String(body.title || body.bv || '').slice(0, 26)}》：${text.slice(0, 46)}`,
@@ -1419,9 +1420,10 @@ export function apply(ctx) {
     }
     if (req.method === 'POST' && path === '/open-folder') {
       const body = await readBody(req)
-      const target = body.what === 'runs' ? renders.RUNS : STORE
+      const target = body.what === 'runs' ? renders.runsDir() : STORE
       try {
         const child = spawn('explorer.exe', [target], { detached: true, stdio: 'ignore', windowsHide: false })
+        child.on('error', (e) => { ctx.logger?.warn?.('打开目录失败：' + String(e?.message ?? e)) })
         child.unref()
         return sendJson(res, 200, { ok: true, path: target })
       } catch (e) {

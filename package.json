@@ -5,11 +5,11 @@
   "author": "Userluckytian",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Userluckytian/dsh-bili-workbench.git"
+    "url": "git+https://github.com/xiaweihuaniubi/dsh-bili-workbench.git"
   },
-  "homepage": "https://github.com/Userluckytian/dsh-bili-workbench#readme",
+  "homepage": "https://github.com/xiaweihuaniubi/dsh-bili-workbench#readme",
   "bugs": {
-    "url": "https://github.com/Userluckytian/dsh-bili-workbench/issues"
+    "url": "https://github.com/xiaweihuaniubi/dsh-bili-workbench/issues"
   },
   "keywords": [
     "dsh",

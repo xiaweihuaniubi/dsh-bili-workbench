@@ -28,7 +28,7 @@ F:\dsh\release-prep\20261027\artifacts
 
 沿用现有仓库：
 
-[Userluckytian/dsh-bili-workbench](https://github.com/Userluckytian/dsh-bili-workbench)
+[xiaweihuaniubi/dsh-bili-workbench](https://github.com/xiaweihuaniubi/dsh-bili-workbench)
 
 建议流程：**克隆现有仓库 → 新建分支 → 合入干净源码 → 检查 → 提交/推送 → 合并 → 打版本标签 → 发布 GitHub Release**。
 
@@ -45,7 +45,7 @@ F:\dsh\release-prep\20261027\artifacts
 
 ```powershell
 New-Item -ItemType Directory -Force 'F:\dsh\github' | Out-Null
-git clone https://github.com/Userluckytian/dsh-bili-workbench.git 'F:\dsh\github\dsh-bili-workbench'
+git clone https://github.com/xiaweihuaniubi/dsh-bili-workbench.git 'F:\dsh\github\dsh-bili-workbench'
 Set-Location 'F:\dsh\github\dsh-bili-workbench'
 git switch -c codex/workbench-1.3.0
 git status --short
@@ -119,7 +119,7 @@ git commit -m "feat: improve workbench forms and creation workflow"
 git push -u origin codex/workbench-1.3.0
 ```
 
-在 GitHub 打开该分支的 Pull Request，核对差异并合并到 `main`。本次改动覆盖此前运行版修复，PR 描述应列清创作、渲染、投稿与交互改动，并说明只做了哪些验证。
+在 GitHub 打开该分支的 Pull Request，核对差异并合并到 `master`。本次改动覆盖此前运行版修复，PR 描述应列清创作、渲染、投稿与交互改动，并说明只做了哪些验证。
 
 不要把 GitHub 密码或 Token 写入命令文件、发布文档、Git remote URL 或源码。使用 Git Credential Manager/浏览器正常登录；若使用 GitHub CLI，可人工运行 `gh auth login`。
 
@@ -128,8 +128,8 @@ git push -u origin codex/workbench-1.3.0
 合并之后从实际将要发布的提交重新打包，不直接拿未合并的开发目录冒充最终版本：
 
 ```powershell
-git switch main
-git pull --ff-only origin main
+git switch master
+git pull --ff-only origin master
 npm ci
 npm run check
 New-Item -ItemType Directory -Force '..\release-assets' | Out-Null
@@ -181,10 +181,16 @@ winget install Gyan.FFmpeg
 
 ### 6.2 安装插件
 
-标签公开后固定版本安装：
+当前可安装默认分支（仓库尚无 `v1.3.0` 标签）：
 
 ```powershell
-dsh plugin --profile web add "github:Userluckytian/dsh-bili-workbench#v1.3.0"
+dsh plugin --profile web add "github:xiaweihuaniubi/dsh-bili-workbench#master"
+```
+
+创建并推送 `v1.3.0` 标签之后，再使用固定版本命令：
+
+```powershell
+dsh plugin --profile web add "github:xiaweihuaniubi/dsh-bili-workbench#v1.3.0"
 ```
 
 或者从 Release 下载 tgz 后安装：

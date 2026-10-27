@@ -9,11 +9,13 @@ DSH（DeepSeek Harness）B站工作台：素材采集、创作方案、原声混
 
 ## 安装
 
-发布v1.3.0标签之后，可安装固定版本：
+当前默认分支为 `master`，可直接安装本仓库版本：
 
 ```powershell
-dsh plugin --profile web add "github:Userluckytian/dsh-bili-workbench#v1.3.0"
+dsh plugin --profile web add "github:xiaweihuaniubi/dsh-bili-workbench#master"
 ```
+
+当前仓库尚未创建 `v1.3.0` 标签，不能仅凭 package.json 的版本号安装该标签。维护者创建并推送标签后，才可将上面的 `#master` 换成 `#v1.3.0` 以固定版本。
 
 下载Release的tgz后也可本地安装（把路径换成实际下载位置）：
 
