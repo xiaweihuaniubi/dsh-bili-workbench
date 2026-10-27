@@ -1,0 +1,80 @@
+{
+  "name": "dsh-bili-workbench",
+  "version": "1.3.0",
+  "description": "DSH 插件：刷 B站 + 素材库 + AI 出片 + 审核发布 + 自动互动",
+  "author": "Userluckytian",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Userluckytian/dsh-bili-workbench.git"
+  },
+  "homepage": "https://github.com/Userluckytian/dsh-bili-workbench#readme",
+  "bugs": {
+    "url": "https://github.com/Userluckytian/dsh-bili-workbench/issues"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "bilibili",
+    "workbench",
+    "remotion",
+    "ai"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "engine/**/*.mjs",
+    "bili-op/*.mjs",
+    "bili-op/package.json",
+    "bili-op/render/package.json",
+    "bili-op/render/src",
+    "bili-op/render/public/mascot",
+    "scripts/*.mjs",
+    "README.md",
+    "LICENSE",
+    "NOTICE.md",
+    "CONTRIBUTORS.md",
+    "CHANGELOG.md",
+    "docs/*.md"
+  ],
+  "engines": {
+    "dsh": ">=0.2.1-rc.1",
+    "node": ">=22"
+  },
+  "scripts": {
+    "check": "node scripts/check-release.mjs",
+    "doctor": "node scripts/doctor.mjs"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.538",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "remotion": "4.0.538",
+    "sharp": "0.34.5"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-settings-plugins"
+      ]
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

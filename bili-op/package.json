@@ -1,0 +1,15 @@
+{
+  "name": "bili-op",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "B站资讯盘点出片引擎（脚本→配音→渲染→封面，全免费，不自动发布）",
+  "scripts": {
+    "gen": "node gen.mjs",
+    "tts": "node tts.mjs",
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "sharp": "^0.34.0"
+  }
+}

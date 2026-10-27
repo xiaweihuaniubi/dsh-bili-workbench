@@ -1,0 +1,15 @@
+{
+  "name": "bili-op-render",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "studio": "remotion studio src/index.tsx",
+    "render": "remotion render src/index.tsx News"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.0",
+    "remotion": "^4.0.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  }
+}

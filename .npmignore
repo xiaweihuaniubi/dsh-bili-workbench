@@ -1,0 +1,13 @@
+node_modules/
+**/node_modules/
+**/runs/
+**/.cache/
+**/public/clips/
+**/public/frames/
+.env*
+*.log
+*.tgz
+*.zip
+store/
+assets-src/
+home/

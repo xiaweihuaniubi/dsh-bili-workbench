@@ -1,0 +1,11 @@
+# dsh-bili-workbench 的 bundle patch
+#
+# 装法：
+#   dsh plugin --profile web add github:<owner>/dsh-bili-workbench
+#   （或先 git clone，再 dsh plugin --profile web add link:<本目录>）
+# 装完必须重启一次 dsh（bundle 层只在启动时组装），然后刷新浏览器页面。
+- insert:
+    - id: bili-workbench
+      name: dsh-bili-workbench
+      config:
+        enabled: true
