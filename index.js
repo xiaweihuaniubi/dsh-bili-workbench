@@ -186,6 +186,50 @@ function targetToday(cfg, d = new Date()) {
 
 const collectedToday = () => storeList({ limit: 2000 }).filter((r) => localDay(r.fetchedAt) === today()).length
 
+/**
+ * 关注关键词：旧配置是字符串数组，新配置是 { text, kind, precision, weight }。
+ * kind=up 表示按 UP 主拉最新投稿；precision=exact 表示标题（或 UP 昵称）必须严格匹配；
+ * weight 是 0–100 的抽中权重，0 表示只当标签用、不参与自动采集。
+ */
+function normalizeKeyword(k) {
+  const raw = typeof k === 'object' && k ? k : {}
+  const text = String(typeof k === 'string' ? k : raw.text || '').trim().slice(0, 24)
+  const n = Math.round(Number(raw.weight))
+  return {
+    text,
+    kind: raw.kind === 'up' ? 'up' : 'content',
+    precision: raw.precision === 'exact' ? 'exact' : 'loose',
+    weight: Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : 50,
+  }
+}
+
+/** 按权重抽一个关键词；全为 0 时退回等权，保证定时采集不会因为调权重而彻底停摆 */
+function pickKeyword(list) {
+  const pool = list.filter((k) => k.weight > 0)
+  const use = pool.length ? pool : list
+  const total = use.reduce((s, k) => s + Math.max(1, k.weight), 0)
+  let r = Math.random() * total
+  for (const k of use) {
+    r -= Math.max(1, k.weight)
+    if (r <= 0) return k
+  }
+  return use[use.length - 1]
+}
+
+/** `bili user videos` 的条目转成搜索卡片的形状：没有封面/点赞，用播放与弹幕顶上，时长是 "HH:MM:SS" */
+function upVideo(x, upName) {
+  const secs = String(x.length || '').split(':').reduce((s, n) => s * 60 + (Number(n) || 0), 0)
+  return {
+    bvid: x.bvid,
+    title: x.title || '',
+    duration: secs,
+    pubdate: x.pubdate || '',
+    author: { name: upName },
+    stat: { view: Number(x.play) || 0, danmaku: Number(x.danmaku) || 0 },
+    url: 'https://www.bilibili.com/video/' + x.bvid,
+  }
+}
+
 function normalizeCfg(c) {
   const out = { ...DEFAULTS, ...(c || {}) }
   // 旧字段不再使用，落盘时顺手清掉
@@ -196,7 +240,11 @@ function normalizeCfg(c) {
   out.enabled = Boolean(out.enabled)
   out.perDay = clampNum(out.perDay, 1, 500, 48)
   out.frameCount = clampNum(out.frameCount, 1, 10, 10)
-  out.keywords = (Array.isArray(out.keywords) ? out.keywords : []).map(String).filter(Boolean).slice(0, 20)
+  const kwSeen = new Set()
+  out.keywords = (Array.isArray(out.keywords) ? out.keywords : [])
+    .map(normalizeKeyword)
+    .filter((k) => k.text && !kwSeen.has(k.text) && kwSeen.add(k.text))
+    .slice(0, 20)
   out.llmKey = String(out.llmKey || '').slice(0, 300)
   out.scheduleRanges = parseRanges(out.scheduleRanges).length ? String(out.scheduleRanges) : '00:00-24:00'
   out.personaPrompt = String(out.personaPrompt ?? DEFAULT_PERSONA).slice(0, 1200)
@@ -254,27 +302,34 @@ const loadSched = () => readJson(scheduleFile(), { lastRunAt: '', lastResult: ''
 /** 跑引擎脚本（子进程），返回输出尾巴 */
 const configuredModelBase = process.env.BILI_OP_LLM_BASE
 let modelBridgeReady = Promise.resolve({})
+
+/** 子进程统一环境：模型链、人设、自己的视频、主人称呼。渲染也要走这套，否则出片里的人和评论里的人设不一致。 */
+function engineEnv(cfg) {
+  const env = {
+    ...process.env,
+    PYTHONUTF8: '1',
+    PYTHONIOENCODING: 'utf-8',
+    BILI_OP_MODELS: cfg.modelChain.join(','),
+  }
+  if (cfg.personaPrompt) env.BILI_OP_PERSONA = cfg.personaPrompt
+  if (!env.BILI_OP_SELF_VIDEOS) env.BILI_OP_SELF_VIDEOS = canon.renderBlock()
+  if (cfg.ownerUid) env.BILI_OWNER_UID = cfg.ownerUid
+  if (cfg.ownerCall) env.BILI_OWNER_CALL = cfg.ownerCall
+  if (!env.OC_API_KEY && cfg.llmKey) {
+    env.OC_API_KEY = cfg.llmKey
+    delete env.BILI_OP_LLM_KEY
+    if (configuredModelBase) env.BILI_OP_LLM_BASE = configuredModelBase
+    else delete env.BILI_OP_LLM_BASE
+  }
+  return env
+}
+
 async function runEngine(script, args = [], timeoutMs = 20 * 60_000, extraEnv = null) {
   await modelBridgeReady
   return new Promise((resolvePromise) => {
     const cfg = loadCfg()
-    const env = {
-      ...process.env,
-      PYTHONUTF8: '1',
-      PYTHONIOENCODING: 'utf-8',
-      BILI_OP_MODELS: cfg.modelChain.join(','),
-    }
+    const env = engineEnv(cfg)
     if (extraEnv) Object.assign(env, extraEnv)
-    if (cfg.personaPrompt) env.BILI_OP_PERSONA = cfg.personaPrompt
-    if (!env.BILI_OP_SELF_VIDEOS) env.BILI_OP_SELF_VIDEOS = canon.renderBlock()
-    if (cfg.ownerUid) env.BILI_OWNER_UID = cfg.ownerUid
-    if (cfg.ownerCall) env.BILI_OWNER_CALL = cfg.ownerCall
-    if (!env.OC_API_KEY && cfg.llmKey) {
-      env.OC_API_KEY = cfg.llmKey
-      delete env.BILI_OP_LLM_KEY
-      if (configuredModelBase) env.BILI_OP_LLM_BASE = configuredModelBase
-      else delete env.BILI_OP_LLM_BASE
-    }
     let out = ''
     let done = false
     const finish = (r) => { if (!done) { done = true; resolvePromise(r) } }
@@ -349,8 +404,10 @@ async function runRound(why = 'manual', { count = 1 } = {}) {
     const outs = []
     if (cfg.keywords.length) {
       const sched = loadSched()
-      const idx = (Number(sched.kwIdx) || 0) % cfg.keywords.length
-      const kw = cfg.keywords[idx]
+      // 以前是纯轮转；现在按权重抽，权重越高越常被选中（0% 的不参与）
+      const pick = pickKeyword(cfg.keywords)
+      const idx = Math.max(0, cfg.keywords.indexOf(pick))
+      const kw = pick.text
       // 1 条时轮流用热门/关键词；≥2 条时两边各分一半
       const kwN = n >= 2 ? Math.max(1, Math.floor(n / 2)) : (idx % 2 === 0 ? 1 : 0)
       const hotN = Math.max(0, n - kwN)
@@ -362,14 +419,15 @@ async function runRound(why = 'manual', { count = 1 } = {}) {
         if (!hot.ok) log('热门采集失败：' + hot.text.slice(-500))
       }
       if (kwN > 0) {
-        const search = await runEngine('collect.mjs', [
-          '--search', kw, '--size', String(Math.max(kwN * 4, 6)), '--max-new', String(kwN), '--frames', String(cfg.frameCount),
-        ])
+        const args = ['--size', String(Math.max(kwN * 4, 6)), '--max-new', String(kwN), '--frames', String(cfg.frameCount)]
+        args.push(pick.kind === 'up' ? '--up' : '--search', kw)
+        if (pick.precision === 'exact') args.push('--exact')
+        const search = await runEngine('collect.mjs', args)
         outs.push(search.text)
         if (!search.ok) log('关键词采集失败：' + search.text.slice(-500))
       }
       writeJson(scheduleFile(), { ...sched, kwIdx: (idx + 1) % cfg.keywords.length })
-      log(`轮次(${why})：热门 ${hotN} + 关键词「${kw}」${kwN} 条`)
+      log(`轮次(${why})：热门 ${hotN} + ${pick.kind === 'up' ? 'UP' : '关键词'}「${pick.kind === 'up' ? '@' : ''}${kw}」${kwN} 条${pick.precision === 'exact' ? '（精确）' : ''} · 权重 ${pick.weight}%`)
     } else {
       const hot = await runEngine('collect.mjs', [
         '--hot', String(Math.max(n * 5, 12)), '--max-new', String(n), '--frames', String(cfg.frameCount),
@@ -483,7 +541,8 @@ function pctFromLine(line, job) {
   return null
 }
 
-function startRender(project, plan, version, voice) {
+async function startRender(project, plan, version, voice) {
+  await modelBridgeReady
   const cfg = loadCfg()
   const renderVoice = voice ? String(voice) : cfg.voice
   if (!VOICES.has(renderVoice)) throw new Error('不支持的配音音色')
@@ -508,12 +567,7 @@ function startRender(project, plan, version, voice) {
   project.renderVoice = renderVoice
   plans.saveProject(project)
 
-  const env = {
-    ...process.env,
-    PYTHONUTF8: '1',
-    BILI_OP_MODELS: cfg.modelChain.join(','),
-  }
-  if (!env.OC_API_KEY && cfg.llmKey) env.OC_API_KEY = cfg.llmKey
+  const env = engineEnv(cfg)
 
   const child = spawn(process.execPath, [
     join(BILI_OP, 'build.mjs'), '--run', runDir, '--burn', '--voice', renderVoice,
@@ -636,6 +690,15 @@ export function apply(ctx) {
     const path = url.pathname.replace(/^\/api\/bili-wb/, '') || '/'
     const q = url.searchParams
 
+    /* 写操作只服务本机：投稿、发评论、改配置不能只依赖宿主绑在 127.0.0.1；
+       只读接口仍放行，免得从别的设备打开工作台时整页打不开 */
+    if (req.method !== 'GET') {
+      const addr = String(req.socket?.remoteAddress || '')
+      if (!(addr === '127.0.0.1' || addr === '::1' || addr.startsWith('::ffff:127.'))) {
+        return sendJson(res, 403, { ok: false, error: '只接受本机访问' })
+      }
+    }
+
     /* ══════════ 账号：登录 / 状态 ══════════ */
     if (req.method === 'GET' && path === '/status') {
       const r = await runBiliAsync(['auth', 'status'], { timeoutMs: 20000 })
@@ -687,9 +750,30 @@ export function apply(ctx) {
       const kw = String(q.get('q') || '').trim().slice(0, 60)
       if (!kw) return sendJson(res, 200, { ok: true, items: [], keyword: '' })
       const size = Math.max(1, Math.min(Number(q.get('size')) || 20, 50))
+      const kind = q.get('kind') === 'up' ? 'up' : 'content'
+      const exact = q.get('precision') === 'exact'
+      /* UP 主：先按昵称找 mid（精确模式直接用全名让 CLI 自己解析），再拉最新投稿 */
+      if (kind === 'up') {
+        let who = kw
+        let upName = kw
+        if (!exact) {
+          const s = await runBiliAsync(['search', 'user', kw, '--order', 'fans'], { timeoutMs: 40000 })
+          const u = (s.data?.items || []).find((x) => x.mid || x.uid)
+          if (!u) return sendJson(res, 200, { ok: true, kind, keyword: kw, who: '', items: [], hint: `没有找到叫「${kw}」的 UP 主` })
+          who = String(u.mid || u.uid)
+          upName = u.name || kw
+        }
+        const r = await runBiliAsync(['user', 'videos', who, '--order', 'new', '--size', String(size)], { timeoutMs: 45000 })
+        const items = (r.data?.items || []).map((x) => upVideo(x, upName))
+        return sendJson(res, 200, { ok: r.ok, kind, exact, keyword: kw, who: upName, total: r.data?.total || 0, items, error: r.error || null })
+      }
       const order = ['default', 'views', 'new', 'danmaku', 'favorites', 'comments'].includes(String(q.get('order'))) ? String(q.get('order')) : 'default'
-      const r = await runBiliAsync(['search', 'video', kw, '--order', order, '--size', String(size)], { timeoutMs: 45000 })
-      return sendJson(res, 200, { ok: r.ok, keyword: kw, total: r.data?.total || 0, items: r.data?.items || [], error: r.error || null })
+      // 精确匹配在本地过滤，所以多取一倍，够筛出一页
+      const want = exact ? Math.min(50, size * 2) : size
+      const r = await runBiliAsync(['search', 'video', kw, '--order', order, '--size', String(want)], { timeoutMs: 45000 })
+      let items = r.data?.items || []
+      if (exact) items = items.filter((x) => String(x.title || '').toLowerCase().includes(kw.toLowerCase())).slice(0, size)
+      return sendJson(res, 200, { ok: r.ok, kind, exact, keyword: kw, total: r.data?.total || 0, items, error: r.error || null })
     }
     if (req.method === 'GET' && path === '/video') {
       const bv = String(q.get('bv') || '').trim()
@@ -740,13 +824,33 @@ export function apply(ctx) {
           || String(r.judge?.why || '').toLowerCase().includes(k)
           || (r.quotes || []).some((x) => String(x.text || '').toLowerCase().includes(k)))
       }
+      const total = rows.length
       rows = rows.slice(0, limit)
       const slim = rows.map(({ subtitle, ...rest }) => ({
         ...rest,
         commented: interact.isCommented(rest.bvid),
         subtitle: subtitle ? { lang: subtitle.lang, chars: subtitle.chars, items: subtitle.items, missing: subtitle.missing || '' } : null,
       }))
-      return sendJson(res, 200, { ok: true, rows: slim, total: rows.length, stats: storeStats(), ranges: parseRanges(loadCfg().scheduleRanges).length })
+      /* fields=index：刷B站只需要索引（bvid/档位/标题/UP）；
+         fields=card：素材库列表只显示前 2 条热评、4 条弹幕、4 个梗、6 帧，裁掉其余，省掉大半体积 */
+      const fields = String(q.get('fields') || '')
+      const pick = fields === 'index'
+        ? (r) => ({
+          bvid: r.bvid, title: r.title, up: { name: r.up?.name || '' },
+          judge: r.judge ? { tier: r.judge.tier } : null, duration: r.duration,
+          fetchedAt: r.fetchedAt, commented: r.commented,
+          quotes: (r.quotes || []).slice(0, 3).map((x) => ({ text: String(x.text || '') })),
+        })
+        : fields === 'card'
+          ? (r) => ({
+            ...r,
+            hotComments: (r.hotComments || []).slice(0, 2),
+            hotDanmaku: (r.hotDanmaku || []).slice(0, 4),
+            memes: (r.memes || []).slice(0, 4),
+            frames: (r.frames || []).slice(0, 6).map((f) => ({ file: f.file })),
+          })
+          : (r) => r
+      return sendJson(res, 200, { ok: true, rows: slim.map(pick), total, stats: storeStats(), ranges: parseRanges(loadCfg().scheduleRanges).length })
     }
     if (req.method === 'GET' && path === '/store/item') {
       const bv = String(q.get('bv') || '')
@@ -1099,7 +1203,7 @@ export function apply(ctx) {
       }
       if (activeJob(project.id)) return sendJson(res, 200, { ok: false, error: '这个项目正在渲染' })
       try {
-        const job = startRender(project, plan, v, body.voice)
+        const job = await startRender(project, plan, v, body.voice)
         return sendJson(res, 200, { ok: true, job: jobView(job) })
       } catch (e) {
         return sendJson(res, 200, { ok: false, error: String(e?.message ?? e) })
@@ -1378,7 +1482,8 @@ export function apply(ctx) {
       const sched = loadSched()
       const prog = rangeProgress(cfg.scheduleRanges)
       return sendJson(res, 200, {
-        ok: true, config: cfg,
+        // 密钥不回传给浏览器；保存时留空表示「不修改」
+        ok: true, config: { ...cfg, llmKey: '', llmKeySet: Boolean(cfg.llmKey) },
         schedule: {
           ...sched, running: roundRunning, todayCount: collectedToday(),
           inWindow: prog.inWindow, target: targetToday(cfg), totalMinutes: prog.total,
@@ -1402,6 +1507,8 @@ export function apply(ctx) {
         'publishEnabled', 'defaultTags', 'defaultZone',
       ]
       for (const k of copyKeys) if (k in body) patch[k] = body[k]
+      // 界面拿不到真实密钥，留空一律当作「不改」，避免误把已存的 key 清掉
+      if ('llmKey' in patch && !String(patch.llmKey || '').trim()) delete patch.llmKey
       const cfg = saveCfg(patch)
       return sendJson(res, 200, { ok: true, config: cfg })
     }
@@ -1491,9 +1598,11 @@ export function apply(ctx) {
   canon.ensureFresh()
     .then((st) => { if (st?.epCount) log(`自己的视频：${st.title} · ${st.epCount} 集`) })
     .catch(() => { /* 离线时用旧缓存 */ })
-  try {
-    setInterval(() => { canon.ensureFresh().catch(() => { /* 忽略 */ }) }, 6 * 3600_000)
-  } catch { /* ignore */ }
+  // 走 ctx.effect：插件重载时旧定时器会被清掉，不会越重载越多
+  ctx.effect(() => {
+    const t = setInterval(() => { canon.ensureFresh().catch(() => { /* 忽略 */ }) }, 6 * 3600_000)
+    return () => clearInterval(t)
+  })
 
   /* ── 主人 @ 任务：每分钟看一眼是否到点（频率可配置） ── */
   let ownerTaskRunning = false
@@ -1520,7 +1629,10 @@ export function apply(ctx) {
     }
   }
   setTimeout(ownerTick, 60_000)
-  try { setInterval(ownerTick, 60_000) } catch { /* ignore */ }
+  ctx.effect(() => {
+    const t = setInterval(ownerTick, 60_000)
+    return () => clearInterval(t)
+  })
 
   /* ── 采集定时器：按时段 + 每日上限平均分配，每分钟看一次 ── */
   try {

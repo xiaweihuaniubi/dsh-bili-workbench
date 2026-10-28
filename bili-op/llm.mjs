@@ -38,7 +38,8 @@ function key() {
 }
 /** 模型链每次调用时读 env：进程内调用（reflect/语气改写）可能在启动后才设置 BILI_OP_MODELS */
 export function models() {
-  return (process.env.BILI_OP_MODELS || 'deepseek-v4.1-flash,big-pickle,glm-5.3-flash')
+  // 兜底链必须和 index.js 的 DEFAULT_CHAIN 一致（宿主没传 env 时才走这里）
+  return (process.env.BILI_OP_MODELS || 'deepseek-v4.1-flash,big-pickle,glm-5.3-flash,jev-1.13,lobsterai/deepseek-flash,loomy/DeepSeek-V4.1-Flash')
     .split(',').map((s) => s.trim()).filter(Boolean)
 }
 let modelIdx = 0

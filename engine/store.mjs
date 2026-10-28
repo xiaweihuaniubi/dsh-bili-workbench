@@ -89,6 +89,8 @@ export function put(rec) {
   ensureStore()
   const p = paths(rec.bvid)
   writeFileSync(p.record, JSON.stringify(rec, null, 2), 'utf8')
+  listCache.delete(rec.bvid + '.json')
+  statsCache = { at: 0, value: null }
   return p.record
 }
 
@@ -134,34 +136,49 @@ export function storeCover(bv, buf) {
 }
 
 /** 列表（按抓取时间倒序） */
+/* 解析缓存：按「文件名 + mtime」命中。列表接口每次都用，没必要把整库 JSON 重新 parse 一遍。 */
+const listCache = new Map()
+
 export function list({ limit = 100 } = {}) {
   if (!existsSync(DIRS.videos)) return []
   const out = []
+  const seen = new Set()
   for (const f of readdirSync(DIRS.videos)) {
     if (!f.endsWith('.json')) continue
+    seen.add(f)
+    const file = join(DIRS.videos, f)
     try {
-      const rec = JSON.parse(readFileSync(join(DIRS.videos, f), 'utf8'))
+      const { mtimeMs } = statSync(file)
+      const hit = listCache.get(f)
+      if (hit && hit.mtimeMs === mtimeMs) { out.push(hit.rec); continue }
+      const rec = JSON.parse(readFileSync(file, 'utf8'))
+      listCache.set(f, { mtimeMs, rec })
       out.push(rec)
     } catch { /* 坏文件跳过 */ }
   }
+  for (const k of listCache.keys()) if (!seen.has(k)) listCache.delete(k)
   out.sort((a, b) => String(b.fetchedAt || '').localeCompare(String(a.fetchedAt || '')))
   return out.slice(0, limit)
 }
 
-/** 库的规模：条数 + 磁盘占用（MB） */
+/** 库的规模：条数 + 磁盘占用（MB）。只用于页面展示，缓存 10 秒省掉每次遍历目录 */
+let statsCache = { at: 0, value: null }
 export function stats() {
+  if (statsCache.value && Date.now() - statsCache.at < 10_000) return statsCache.value
   let bytes = 0
   let files = 0
   const walk = (d) => {
     if (!existsSync(d)) return
     for (const f of readdirSync(d)) {
       const p = join(d, f)
-      const st = statSync(p)
+      let st
+      try { st = statSync(p) } catch { continue }
       if (st.isDirectory()) walk(p)
       else { bytes += st.size; files++ }
     }
   }
   walk(STORE)
   const n = existsSync(DIRS.videos) ? readdirSync(DIRS.videos).filter((f) => f.endsWith('.json')).length : 0
-  return { videos: n, files, mb: Number((bytes / 1024 / 1024).toFixed(1)), path: STORE }
+  statsCache = { at: Date.now(), value: { videos: n, files, mb: Number((bytes / 1024 / 1024).toFixed(1)), path: STORE } }
+  return statsCache.value
 }

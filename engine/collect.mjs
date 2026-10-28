@@ -4,6 +4,8 @@
  *   node collect.mjs BV16DnN6KEUo BV1FynG6WE5X     # 指定视频
  *   node collect.mjs --hot 6                        # 从 B站 综合热门里取 6 条
  *   node collect.mjs --search "DeepSeek" --size 5
+ *   node collect.mjs --up "老番茄" --size 5           # 按 UP 主拉最新投稿
+ *   node collect.mjs --search "盘点" --exact          # 只保留标题含关键词的结果
  *   node collect.mjs ... --refresh                  # 忽略新鲜度强制重抓
  *
  * 抓什么：元数据 + 逐字稿（带时间戳）+ 关键帧（默认 6 张）+ 封面
@@ -60,7 +62,7 @@ function fetchHotDanmaku(bv) {
   return { items, total: Number(r.data?.total) || all.length }
 }
 
-/** 候选：--hot / --search / 直接给 BV */
+/** 候选：--hot / --search / --up / 直接给 BV */
 function candidates() {
   const list = []
   const hotN = Number(arg('hot', 0))
@@ -71,8 +73,25 @@ function candidates() {
   const q = arg('search', '')
   if (q) {
     const size = Number(arg('size', 5)) || 5
-    const r = runBili(['search', 'video', q, '--size', String(size)], { timeoutMs: 60000 })
-    for (const it of (r.data?.items || [])) list.push({ bvid: it.bvid, title: it.title, reason: '' })
+    // 精确模式要多取一倍：标题过滤后还要保证一页够数
+    const want = flag('exact') ? Math.min(50, size * 2) : size
+    const r = runBili(['search', 'video', q, '--size', String(want)], { timeoutMs: 60000 })
+    let items = r.data?.items || []
+    if (flag('exact')) items = items.filter((it) => String(it.title || '').toLowerCase().includes(q.toLowerCase())).slice(0, size)
+    for (const it of items) list.push({ bvid: it.bvid, title: it.title, reason: '' })
+  }
+  const up = arg('up', '')
+  if (up) {
+    const size = Number(arg('size', 5)) || 5
+    // 宽松：按昵称搜人，取粉丝最多的那个；精确：交给 CLI 按完整昵称解析
+    let who = up
+    if (!flag('exact')) {
+      const s = runBili(['search', 'user', up, '--order', 'fans'], { timeoutMs: 60000 })
+      const u = (s.data?.items || []).find((x) => x.mid || x.uid)
+      if (u) who = String(u.mid || u.uid)
+    }
+    const r = runBili(['user', 'videos', who, '--order', 'new', '--size', String(size)], { timeoutMs: 60000 })
+    for (const it of (r.data?.items || [])) list.push({ bvid: it.bvid, title: it.title || '', reason: '' })
   }
   for (const a of process.argv.slice(2)) {
     if (a.startsWith('--') || a.startsWith('-')) continue
@@ -177,7 +196,7 @@ async function main() {
   ensureStore()
   const cands = candidates()
   if (!cands.length) {
-    console.error('用法: node collect.mjs BV... | --hot N | --search "关键词" [--size N] [--max-new N] [--frames 10] [--refresh] [--no-frames] [--no-hot]')
+    console.error('用法: node collect.mjs BV... | --hot N | --search "关键词" [--exact] | --up "UP名" [--exact] [--size N] [--max-new N] [--frames 10] [--refresh] [--no-frames] [--no-hot]')
     process.exit(2)
   }
   const refresh = flag('refresh')

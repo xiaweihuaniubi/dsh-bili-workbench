@@ -74,6 +74,20 @@ window.__ModuleLoader__.load({
       scripted: ['脚本已准备', ''],
     }
     const stageOf = (s) => STAGES[s] || [s || '未知', '']
+    /** 关注关键词统一成 { text, kind, precision, weight }；旧配置是纯字符串，这里兜底 */
+    const kwOf = (k) => {
+      const raw = k && typeof k === 'object' ? k : {}
+      const w = Number(raw.weight)
+      return {
+        text: String(typeof k === 'string' ? k : raw.text || '').trim(),
+        kind: raw.kind === 'up' ? 'up' : 'content',
+        precision: raw.precision === 'exact' ? 'exact' : 'loose',
+        weight: Number.isFinite(w) ? Math.max(0, Math.min(100, Math.round(w))) : 50,
+      }
+    }
+    const kwLabel = (k) => (k.kind === 'up' ? '@' : '') + k.text
+    const kwHint = (k) => `${k.kind === 'up' ? 'UP主' : '内容'} · 权重 ${k.weight}% · ${k.precision === 'exact' ? '精确匹配' : '宽松'}`
+    const kwTip = '权重决定定时采集时被抽中的概率；0% 只当标签用。精确 = 只保留标题含该词的结果（UP 主则要求昵称完全一致）。'
     const shotNames = { title: '片头', item: '解说', scene: '对话', data: '数据', outro: '片尾', broll: '原片' }
     const styleNames = { A: '吐槽整活', B: '名场面混剪', C: '自定义' }
     function CreativePicker({ style, customStyle, onStyle, onCustom, disabled }) {
@@ -175,9 +189,20 @@ window.__ModuleLoader__.load({
   --wb-tx:var(--dsw-alias-label-primary,#0f1115);
   --wb-dim:var(--dsw-alias-label-secondary,#61666b);
   --wb-dim2:var(--dsw-alias-label-tertiary,#81858c);
-  --wb-acc:#fb7299; --wb-green:#22c55e; --wb-blue:#3b82f6; --wb-gray:#9aa0a6; --wb-amber:#f59e0b; --wb-red:#ef4444;
+  --wb-acc:#fb7299; --wb-green:#22c55e; --wb-blue:#3b82f6; --wb-gray:#9aa0a6; --wb-amber:#f59e0b;
+  /* 危险色只在这里定义：文字用 --wb-danger-text（#ef4444 当字色只有 3.8:1，不达标），填充用 --wb-danger。 */
+  --wb-danger:#cf4141; --wb-danger-hover:#bd3939;
+  --wb-danger-text:#b91c1c; --wb-danger-text:light-dark(#b91c1c,#f87171);
+  --wb-danger-line:rgba(239,68,68,.3); --wb-danger-bg:rgba(239,68,68,.06);
+  --wb-ok-text:#15803d; --wb-ok-text:light-dark(#15803d,#4ade80);
+  --wb-ok-line:rgba(34,197,94,.3); --wb-ok-bg:rgba(34,197,94,.06);
   /* 强调色当文字用时必须更深：品牌粉 #fb7299 直接当字色只有 2.5:1，只保留给填充/边框/进度条 */
   --wb-acc-text:#b02a5b; --wb-acc-text:light-dark(#b02a5b,#ffabcb);
+  /* 品牌粉的浅色态统一从这里取：选中底纹、悬停描边、未读徽标，别在各规则里另写 rgba */
+  --wb-acc-soft:color-mix(in srgb,var(--wb-acc) 8%,transparent);
+  --wb-acc-soft2:color-mix(in srgb,var(--wb-acc) 12%,transparent);
+  --wb-acc-line:color-mix(in srgb,var(--wb-acc) 42%,transparent);
+  --wb-acc-badge:#c2255c;
   /* 标签色板：chip/tier/badge/cmt/创作风格选中态共用，只在这里改色，别在各规则里另写一处。
      取向参考 B站：低饱和浅底、无描边、4px 圆角，状态只靠底色+文字色区分。 */
   --wb-tag-worth-bg:#eaf7ef; --wb-tag-worth-bg:light-dark(#eaf7ef,#14301f);
@@ -197,48 +222,52 @@ window.__ModuleLoader__.load({
   --wb-tag-sel-bd:#f7c6d8; --wb-tag-sel-bd:light-dark(#f7c6d8,#79405a);
   --wb-rail:color-mix(in srgb,var(--dsw-alias-label-primary,#0f1115) 3%,var(--dsw-alias-bg-base,#fff));
   --wb-shadow:0 1px 2px rgba(15,17,21,.04);
+  /* 字号与圆角只在这套刻度里取值，规则里不要再写数值：11/12 元信息、13 正文、15 标题、20 页面标题与统计数；
+     4 标签与小控件、8 卡片与输入、12 页面级容器。40px 只给空态图形。 */
+  --wb-fs-2xs:11px; --wb-fs-xs:12px; --wb-fs-sm:13px; --wb-fs-md:15px; --wb-fs-lg:20px;
+  --wb-r-xs:4px; --wb-r-sm:8px; --wb-r-lg:12px;
   display:flex;height:calc(100vh - 76px);max-height:calc(100vh - 76px);min-height:480px;position:relative;overflow:hidden;
   background:var(--wb-bg);color:var(--wb-tx);
-  font:14px/1.5 "Microsoft YaHei","Segoe UI",system-ui,sans-serif;
+  font-family:"Microsoft YaHei","Segoe UI",system-ui,sans-serif;font-size:var(--wb-fs-sm);line-height:1.5;
 }
 [data-wb-root] *{box-sizing:border-box}
 [data-wb-rail]{width:196px;flex:none;background:var(--wb-rail);border-right:1px solid var(--wb-line);
   display:flex;flex-direction:column;padding:16px 10px;gap:2px;transition:width .16s ease;}
-[data-wb-brand]{font-size:15px;font-weight:800;padding:6px 12px 16px;letter-spacing:.02em;white-space:nowrap;overflow:hidden;}
-[data-wb-brand] small{display:block;font-size:11px;font-weight:500;color:var(--wb-dim2);margin-top:3px;}
-[data-wb-nav]{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;margin-bottom:2px;border:0;border-radius:9px;
+[data-wb-brand]{font-size:var(--wb-fs-md);font-weight:800;padding:6px 12px 16px;letter-spacing:.02em;white-space:nowrap;overflow:hidden;}
+[data-wb-brand] small{display:block;font-size:var(--wb-fs-2xs);font-weight:500;color:var(--wb-dim2);margin-top:3px;}
+[data-wb-nav]{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;margin-bottom:2px;border:0;border-radius:var(--wb-r-sm);
   background:transparent;color:var(--wb-dim);font:inherit;text-align:left;cursor:pointer;position:relative;white-space:nowrap;}
 [data-wb-nav]:hover{background:var(--wb-card2);color:var(--wb-tx);}
-[data-wb-nav][aria-selected="true"]{background:rgba(251,114,153,.12);color:var(--wb-acc-text);font-weight:700;}
-[data-wb-nav][aria-selected="true"]::before{content:"";position:absolute;left:-10px;top:9px;bottom:9px;width:3px;border-radius:3px;background:var(--wb-acc);}
-[data-wb-nav] .ico{font-size:15px;width:18px;text-align:center;flex:none;}
+[data-wb-nav][aria-current="page"]{background:var(--wb-acc-soft2);color:var(--wb-acc-text);font-weight:700;}
+[data-wb-nav][aria-current="page"]::before{content:"";position:absolute;left:-10px;top:9px;bottom:9px;width:3px;border-radius:999px;background:var(--wb-acc);}
+[data-wb-nav] .ico{font-size:var(--wb-fs-md);width:18px;text-align:center;flex:none;}
 [data-wb-nav] [data-wb-label]{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-[data-wb-nav] .badge{margin-left:auto;font-size:10px;padding:0 6px;border-radius:999px;background:#c2255c;color:#fff;}
+[data-wb-nav] .badge{margin-left:auto;font-size:var(--wb-fs-2xs);padding:0 6px;border-radius:999px;background:var(--wb-acc-badge);color:#fff;}
 [data-wb-rail-foot]{margin-top:auto;padding:8px 4px 0;border-top:1px solid var(--wb-line);}
-[data-wb-ghost]{width:100%;padding:7px;border-radius:8px;border:1px solid var(--wb-line);background:transparent;color:var(--wb-dim);font:inherit;cursor:pointer;}
+[data-wb-ghost]{width:100%;padding:7px;border-radius:var(--wb-r-sm);border:1px solid var(--wb-line);background:transparent;color:var(--wb-dim);font:inherit;cursor:pointer;}
 [data-wb-ghost]:hover{background:var(--wb-card2);color:var(--wb-tx);}
 [data-wb-root][data-collapsed] [data-wb-rail]{width:62px;padding:16px 6px;}
 [data-wb-root][data-collapsed] [data-wb-label],
 [data-wb-root][data-collapsed] [data-wb-brand] small{display:none;}
 [data-wb-root][data-collapsed] [data-wb-brand]{font-size:0;padding:4px 0 14px;text-align:center;}
-[data-wb-root][data-collapsed] [data-wb-brand]::after{content:"WB";font-size:13px;}
+[data-wb-root][data-collapsed] [data-wb-brand]::after{content:"WB";font-size:var(--wb-fs-sm);}
 [data-wb-root][data-collapsed] [data-wb-nav]{justify-content:center;padding:10px 0;}
 [data-wb-main]{flex:1;min-width:0;overflow:auto;padding:20px 24px 34px;}
 [data-wb-page]{display:flex;flex-direction:column;gap:14px;max-width:1180px;}
 [data-wb-head]{display:flex;align-items:center;gap:12px;margin-bottom:2px;flex-wrap:wrap;}
-[data-wb-title]{font-size:19px;font-weight:800;}
-[data-wb-sub]{font-size:12px;color:var(--wb-dim2);}
+[data-wb-title]{font-size:var(--wb-fs-lg);font-weight:800;}
+[data-wb-sub]{font-size:var(--wb-fs-xs);color:var(--wb-dim2);}
 [data-wb-grow]{flex:1;min-width:0;}
 [data-wb-row]{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 [data-wb-col]{display:flex;flex-direction:column;gap:10px;}
-[data-wb-btn]{padding:7px 13px;border-radius:9px;border:1px solid var(--wb-line);background:var(--wb-card2);color:var(--wb-tx);font:inherit;cursor:pointer;white-space:nowrap;}
-[data-wb-btn]:hover{border-color:rgba(251,114,153,.5);}
+[data-wb-btn]{padding:7px 13px;border-radius:var(--wb-r-sm);border:1px solid var(--wb-line);background:var(--wb-card2);color:var(--wb-tx);font:inherit;cursor:pointer;white-space:nowrap;}
+[data-wb-btn]:hover{border-color:var(--wb-acc-line);}
 [data-wb-btn][data-primary]{background:var(--wb-acc);border-color:var(--wb-acc);color:#fff;font-weight:600;}
-[data-wb-btn][data-sm]{padding:4px 10px;font-size:12px;}
+[data-wb-btn][data-sm]{padding:4px 10px;font-size:var(--wb-fs-xs);}
 [data-wb-btn][disabled]{opacity:.45;cursor:not-allowed;}
 /* 四种标签共用一套外形：12px、4px 圆角、无描边、低饱和浅底，状态只靠底色+文字色区分。
    中性态也上灰底（B站 的灰底标签），不再用彩色描边；半透明底会随宿主表面和照片漂移，一律不用。 */
-[data-wb-chip],[data-wb-tier],[data-wb-badge],[data-wb-cmt]{display:inline-flex;align-items:center;gap:4px;font-size:12px;line-height:1.6;padding:1px 7px;border:0;border-radius:4px;white-space:nowrap;background:var(--wb-tag-skip-bg);color:var(--wb-tag-skip-fg);}
+[data-wb-chip],[data-wb-tier],[data-wb-badge],[data-wb-cmt]{display:inline-flex;align-items:center;gap:4px;font-size:var(--wb-fs-xs);line-height:1.6;padding:1px 7px;border:0;border-radius:var(--wb-r-xs);white-space:nowrap;background:var(--wb-tag-skip-bg);color:var(--wb-tag-skip-fg);}
 [data-wb-cmt]{background:var(--wb-tag-warn-bg);color:var(--wb-tag-warn-fg);flex:none;}
 [data-wb-chip][data-sel]{background:var(--wb-tag-sel-bg);color:var(--wb-tag-sel-fg);}
 [data-wb-chip][data-ok]{background:var(--wb-tag-worth-bg);color:var(--wb-tag-worth-fg);}
@@ -246,83 +275,83 @@ window.__ModuleLoader__.load({
 [data-wb-tier="值得看"],[data-wb-tier][data-tone="worth"],[data-wb-badge][data-tone="worth"]{background:var(--wb-tag-worth-bg);color:var(--wb-tag-worth-fg);}
 [data-wb-tier="可以看"],[data-wb-tier][data-tone="ok"],[data-wb-badge][data-tone="ok"]{background:var(--wb-tag-ok-bg);color:var(--wb-tag-ok-fg);}
 [data-wb-tier="跳过"],[data-wb-tier][data-tone="skip"],[data-wb-badge][data-tone="skip"]{background:var(--wb-tag-skip-bg);color:var(--wb-tag-skip-fg);}
-[data-wb-input]{width:100%;box-sizing:border-box;padding:8px 10px;border-radius:9px;font-size:12px;border:1px solid var(--wb-line);background:var(--wb-card2);color:var(--wb-tx);font-family:inherit;}
+[data-wb-input]{width:100%;box-sizing:border-box;padding:8px 10px;border-radius:var(--wb-r-sm);font-size:var(--wb-fs-xs);border:1px solid var(--wb-line);background:var(--wb-card2);color:var(--wb-tx);font-family:inherit;}
 [data-wb-input]:focus{outline:none;border-color:var(--wb-acc);}
 [data-wb-input][data-area]{resize:vertical;min-height:64px;line-height:19px;}
 [data-wb-input][data-num]{width:84px;text-align:center;}
-[data-wb-search]{width:100%;padding:10px 14px;border-radius:11px;border:1px solid var(--wb-line);background:var(--wb-card2);color:var(--wb-tx);font:inherit;}
+[data-wb-search]{width:100%;padding:10px 14px;border-radius:var(--wb-r-sm);border:1px solid var(--wb-line);background:var(--wb-card2);color:var(--wb-tx);font:inherit;}
 [data-wb-search]:focus{outline:none;border-color:var(--wb-acc);}
 [data-wb-searchwrap]{max-width:560px;margin:0 auto 12px;position:relative;width:100%;}
-[data-wb-searchwrap] .kbd{position:absolute;right:12px;top:11px;font-size:11px;color:var(--wb-dim2);}
+[data-wb-searchwrap] .kbd{position:absolute;right:12px;top:11px;font-size:var(--wb-fs-2xs);color:var(--wb-dim2);}
 [data-wb-split]{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
 @media(max-width:980px){[data-wb-split]{grid-template-columns:1fr;}}
-@media(max-width:820px){[data-wb-rail]{width:62px;padding:16px 6px;}[data-wb-label],[data-wb-brand] small{display:none;}[data-wb-brand]{font-size:0;text-align:center;}[data-wb-brand]::after{content:"WB";font-size:13px;}[data-wb-nav]{justify-content:center;padding:10px 0;}[data-wb-main]{padding:16px;}}
-[data-wb-sec]{display:flex;flex-direction:column;gap:10px;padding:14px;border:1px solid var(--wb-line);border-radius:13px;background:var(--wb-card);box-shadow:var(--wb-shadow);}
-[data-wb-h]{font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--wb-dim2);}
-[data-wb-projtitle]{font-size:14.5px;font-weight:700;}
-[data-wb-note]{font-size:11.5px;line-height:17px;color:var(--wb-dim2);}
-[data-wb-meta]{font-size:11.5px;color:var(--wb-dim2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-[data-wb-why]{font-size:12.5px;color:var(--wb-dim);line-height:1.55;}
-[data-wb-pre]{margin:0;padding:10px 12px;border-radius:9px;font-size:11.5px;line-height:18px;white-space:pre-wrap;word-break:break-word;background:var(--wb-card2);color:var(--wb-dim);max-height:280px;overflow:auto;}
-[data-wb-err]{font-size:12px;line-height:18px;padding:8px 10px;border-radius:9px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.28);color:#b91c1c;color:light-dark(#b91c1c,#f87171);word-break:break-word;}
-[data-wb-okmsg]{font-size:12px;line-height:18px;padding:8px 10px;border-radius:9px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.28);color:#15803d;color:light-dark(#15803d,#4ade80);}
-[data-wb-loading]{font-size:12px;color:var(--wb-dim2);}
+@media(max-width:820px){[data-wb-rail]{width:62px;padding:16px 6px;}[data-wb-label],[data-wb-brand] small{display:none;}[data-wb-brand]{font-size:0;text-align:center;}[data-wb-brand]::after{content:"WB";font-size:var(--wb-fs-sm);}[data-wb-nav]{justify-content:center;padding:10px 0;}[data-wb-main]{padding:16px;}}
+[data-wb-sec]{display:flex;flex-direction:column;gap:10px;padding:14px;border:1px solid var(--wb-line);border-radius:var(--wb-r-sm);background:var(--wb-card);box-shadow:var(--wb-shadow);}
+[data-wb-h]{font-size:var(--wb-fs-2xs);font-weight:700;letter-spacing:.04em;color:var(--wb-dim2);}
+[data-wb-projtitle]{font-size:var(--wb-fs-md);font-weight:700;}
+[data-wb-note]{font-size:var(--wb-fs-xs);line-height:17px;color:var(--wb-dim2);}
+[data-wb-meta]{font-size:var(--wb-fs-xs);color:var(--wb-dim2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+[data-wb-why]{font-size:var(--wb-fs-sm);color:var(--wb-dim);line-height:1.55;}
+[data-wb-pre]{margin:0;padding:10px 12px;border-radius:var(--wb-r-sm);font-size:var(--wb-fs-xs);line-height:18px;white-space:pre-wrap;word-break:break-word;background:var(--wb-card2);color:var(--wb-dim);max-height:280px;overflow:auto;}
+[data-wb-err]{font-size:var(--wb-fs-xs);line-height:18px;padding:8px 10px;border-radius:var(--wb-r-sm);background:var(--wb-danger-bg);border:1px solid var(--wb-danger-line);color:var(--wb-danger-text);word-break:break-word;}
+[data-wb-okmsg]{font-size:var(--wb-fs-xs);line-height:18px;padding:8px 10px;border-radius:var(--wb-r-sm);background:var(--wb-ok-bg);border:1px solid var(--wb-ok-line);color:var(--wb-ok-text);}
+[data-wb-loading]{font-size:var(--wb-fs-xs);color:var(--wb-dim2);}
 [data-wb-grid]{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));}
 [data-wb-group]{display:flex;flex-direction:column;gap:8px}
 [data-wb-grouphead]{display:flex;align-items:center;gap:8px}
-[data-wb-groupcount]{font-size:12px;color:var(--wb-dim2)}
-[data-wb-card]{display:flex;flex-direction:column;overflow:hidden;border-radius:13px;border:1px solid var(--wb-line);background:var(--wb-card);box-shadow:var(--wb-shadow);min-width:0;}
-[data-wb-card]:hover{border-color:rgba(251,114,153,.45);}
-[data-wb-cover]{position:relative;aspect-ratio:16/9;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:11px;color:rgba(255,255,255,.85);font-family:ui-monospace,Consolas,monospace;background:linear-gradient(135deg,#4c6ef5,#845ef7 55%,#0ca678);}
+[data-wb-groupcount]{font-size:var(--wb-fs-xs);color:var(--wb-dim)}
+[data-wb-card]{display:flex;flex-direction:column;overflow:hidden;border-radius:var(--wb-r-sm);border:1px solid var(--wb-line);background:var(--wb-card);box-shadow:var(--wb-shadow);min-width:0;}
+[data-wb-card]:hover{border-color:var(--wb-acc-line);}
+[data-wb-cover]{position:relative;aspect-ratio:16/9;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:var(--wb-fs-2xs);color:rgba(255,255,255,.85);font-family:ui-monospace,Consolas,monospace;}
 [data-wb-cover] img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
 [data-wb-cover] [data-wb-tier]{position:absolute;left:8px;top:8px;z-index:2;}
-[data-wb-cover] [data-wb-dur]{position:absolute;right:7px;bottom:7px;font-size:10px;padding:1px 6px;border-radius:5px;background:rgba(0,0,0,.62);color:#fff;font-family:ui-monospace,monospace;z-index:2;}
+[data-wb-cover] [data-wb-dur]{position:absolute;right:7px;bottom:7px;font-size:var(--wb-fs-2xs);padding:1px 6px;border-radius:var(--wb-r-sm);background:rgba(0,0,0,.62);color:#fff;font-family:ui-monospace,monospace;z-index:2;}
 [data-wb-body]{padding:11px 13px 13px;display:flex;flex-direction:column;gap:6px;min-width:0;}
-[data-wb-cardtitle]{font-size:13.5px;font-weight:700;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word;}
-[data-wb-mat]{display:flex;align-items:flex-start;gap:14px;padding:14px;border:1px solid var(--wb-line);border-radius:13px;background:var(--wb-card);box-shadow:var(--wb-shadow);}
-[data-wb-mat] [data-wb-thumb]{width:188px;flex:none;border-radius:9px;overflow:hidden;background:var(--wb-card2);position:relative;aspect-ratio:16/9;}
+[data-wb-cardtitle]{font-size:var(--wb-fs-md);font-weight:700;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word;}
+[data-wb-mat]{display:flex;align-items:flex-start;gap:14px;padding:14px;border:1px solid var(--wb-line);border-radius:var(--wb-r-sm);background:var(--wb-card);box-shadow:var(--wb-shadow);}
+[data-wb-mat] [data-wb-thumb]{width:188px;flex:none;border-radius:var(--wb-r-sm);overflow:hidden;background:var(--wb-card2);position:relative;aspect-ratio:16/9;}
 [data-wb-mat] [data-wb-thumb] img{width:100%;height:100%;object-fit:cover;display:block;}
 [data-wb-mat] .body{flex:1;min-width:0;display:flex;flex-direction:column;gap:7px;}
 @media(max-width:980px){[data-wb-mat]{flex-direction:column;}[data-wb-mat] [data-wb-thumb]{width:100%;}}
 [data-wb-quotes]{display:flex;flex-direction:column;gap:5px;}
-[data-wb-quote]{font-size:12.5px;padding:6px 9px;border-radius:8px;background:var(--wb-card2);border:1px solid var(--wb-line);line-height:1.5;}
+[data-wb-quote]{font-size:var(--wb-fs-sm);padding:6px 9px;border-radius:var(--wb-r-sm);background:var(--wb-card2);border:1px solid var(--wb-line);line-height:1.5;}
 [data-wb-quote] b{color:#1d4ed8;color:light-dark(#1d4ed8,#7aa7ff);font-family:ui-monospace,monospace;font-weight:700;margin-right:6px;}
 [data-wb-frames]{display:flex;gap:6px;flex-wrap:wrap;}
-[data-wb-frames] img{width:76px;height:43px;object-fit:cover;border-radius:6px;border:1px solid var(--wb-line);}
+[data-wb-frames] img{width:76px;height:43px;object-fit:cover;border-radius:var(--wb-r-sm);border:1px solid var(--wb-line);}
 [data-wb-bar]{height:7px;border-radius:999px;background:var(--wb-card2);overflow:hidden;}
 [data-wb-bar] i{display:block;height:100%;background:linear-gradient(90deg,var(--wb-acc),#8b5cf6);transition:width .3s;}
 [data-wb-shots]{display:flex;gap:6px;flex-wrap:wrap;}
-[data-wb-shot]{font-size:11px;padding:3px 8px;border-radius:6px;background:var(--wb-card2);border:1px solid var(--wb-line);color:var(--wb-dim);}
+[data-wb-shot]{font-size:var(--wb-fs-2xs);padding:3px 8px;border-radius:var(--wb-r-sm);background:var(--wb-card2);border:1px solid var(--wb-line);color:var(--wb-dim);}
 [data-wb-shot] b{color:var(--wb-tx);}
-[data-wb-login]{display:flex;gap:18px;align-items:flex-start;padding:16px;border:1px solid rgba(251,114,153,.4);border-radius:13px;background:rgba(251,114,153,.08);}
-[data-wb-qr]{width:150px;height:150px;border-radius:10px;background:#fff;display:flex;align-items:center;justify-content:center;flex:none;overflow:hidden;}
+[data-wb-login]{display:flex;gap:18px;align-items:flex-start;padding:16px;border:1px solid var(--wb-acc-line);border-radius:var(--wb-r-lg);background:var(--wb-acc-soft);}
+[data-wb-qr]{width:150px;height:150px;border-radius:var(--wb-r-sm);background:#fff;display:flex;align-items:center;justify-content:center;flex:none;overflow:hidden;}
 [data-wb-qr] img{width:100%;height:100%;object-fit:contain;}
-[data-wb-qr] .ph{width:118px;height:118px;border-radius:4px;background:repeating-conic-gradient(#0b1020 0 25%,#fff 0 50%) 0 0/16px 16px;}
-[data-wb-stat]{padding:12px 14px;border:1px solid var(--wb-line);border-radius:12px;background:var(--wb-card);}
-[data-wb-stat] b{display:block;font-size:20px;line-height:1.2;}
-[data-wb-stat] span{font-size:11.5px;color:var(--wb-dim2);}
-[data-wb-field]{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--wb-dim);flex-wrap:wrap;}
+[data-wb-qr] .ph{width:118px;height:118px;border-radius:var(--wb-r-xs);background:repeating-conic-gradient(#0b1020 0 25%,#fff 0 50%) 0 0/16px 16px;}
+[data-wb-stat]{padding:12px 14px;border:1px solid var(--wb-line);border-radius:var(--wb-r-lg);background:var(--wb-card);}
+[data-wb-stat] b{display:block;font-size:var(--wb-fs-lg);line-height:1.2;}
+[data-wb-stat] span{font-size:var(--wb-fs-xs);color:var(--wb-dim2);}
+[data-wb-field]{display:flex;align-items:center;gap:8px;font-size:var(--wb-fs-sm);color:var(--wb-dim);flex-wrap:wrap;}
 [data-wb-field] input, [data-wb-field] select{max-width:100%;}
-[data-wb-toggle]{display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;font-size:12.5px;color:var(--wb-dim);}
+[data-wb-toggle]{display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;font-size:var(--wb-fs-sm);color:var(--wb-dim);}
 [data-wb-toggle] input{accent-color:var(--wb-acc);}
 [data-wb-overlay]{position:absolute;inset:0;z-index:60;background:rgba(3,7,18,.62);backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;padding:24px;}
-[data-wb-overlay] video{max-width:96%;max-height:88%;border-radius:12px;background:#000;}
-[data-wb-overlay] .x{position:absolute;top:14px;right:18px;font-size:22px;color:#fff;background:transparent;border:0;cursor:pointer;}
-[data-wb-empty]{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;padding:46px 20px;border:1px dashed var(--wb-line);border-radius:12px;background:rgba(255,255,255,.012);text-align:center;}
+[data-wb-overlay] video{max-width:96%;max-height:88%;border-radius:var(--wb-r-lg);background:#000;}
+[data-wb-overlay] .x{position:absolute;top:14px;right:18px;font-size:var(--wb-fs-lg);color:#fff;background:transparent;border:0;cursor:pointer;}
+[data-wb-empty]{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;padding:46px 20px;border:1px dashed var(--wb-line);border-radius:var(--wb-r-lg);background:rgba(255,255,255,.012);text-align:center;}
 [data-wb-empty-ico]{font-size:40px;line-height:1;opacity:.5;filter:grayscale(.15);}
-[data-wb-empty-title]{font-size:14px;font-weight:600;color:var(--wb-tx);}
-[data-wb-empty-hint]{font-size:12px;line-height:1.7;color:var(--wb-dim2);max-width:440px;}
+[data-wb-empty-title]{font-size:var(--wb-fs-md);font-weight:600;color:var(--wb-tx);}
+[data-wb-empty-hint]{font-size:var(--wb-fs-xs);line-height:1.7;color:var(--wb-dim2);max-width:440px;}
 [data-wb-empty] [data-wb-btn]{margin-top:4px;}
-[data-wb-kv]{font-size:11.5px;line-height:19px;color:var(--wb-dim2);word-break:break-all;}
+[data-wb-kv]{font-size:var(--wb-fs-xs);line-height:19px;color:var(--wb-dim2);word-break:break-all;}
 [data-wb-divider]{height:1px;background:var(--wb-line);margin:2px 0;}
-[data-wb-composer]{display:flex;flex-direction:column;gap:8px;padding:10px 12px;border:1px solid rgba(251,114,153,.35);border-radius:11px;background:rgba(251,114,153,.06);}
+[data-wb-composer]{display:flex;flex-direction:column;gap:8px;padding:10px 12px;border:1px solid var(--wb-acc-line);border-radius:var(--wb-r-sm);background:var(--wb-acc-soft);}
 
 /* B站创作工作台：粉色仅用于选中和主要操作。 */
 [data-wb-root]{font-family:"Segoe UI","Microsoft YaHei",sans-serif;--wb-shadow:none;--wb-rail:var(--wb-panel)}
 [data-wb-rail]{width:156px;padding:20px 10px;gap:6px}
 [data-wb-brand]{font-weight:650;letter-spacing:0;padding:2px 10px 24px}
-[data-wb-brand] small{font-size:11px;margin-top:7px}
-[data-wb-nav]{border-radius:6px;padding:11px 10px;font-size:13px;font-weight:500}
+[data-wb-brand] small{font-size:var(--wb-fs-2xs);margin-top:7px}
+[data-wb-nav]{border-radius:var(--wb-r-sm);padding:11px 10px;font-size:var(--wb-fs-sm);font-weight:500}
 [data-wb-nav] .ico{display:flex;align-items:center;justify-content:center;width:20px}
 /* 实测：图标墨迹中心比中文字形中心高约 0.56px，且六个图标高度从 13.3 到 16.7px 不等。
    统一下移半像素 + 按图标归一化到同一光学高度；non-scaling-stroke 让缩放不改变描边粗细。 */
@@ -331,29 +360,31 @@ window.__ModuleLoader__.load({
 [data-wb-nav] .ico svg[data-i="store"] path{transform:scale(1.21)}
 [data-wb-nav] .ico svg[data-i="scroll"] path,[data-wb-nav] .ico svg[data-i="create"] path{transform:scale(1.06)}
 [data-wb-nav] .ico svg[data-i="review"] path,[data-wb-nav] .ico svg[data-i="settings"] path,[data-wb-nav] .ico svg[data-i="mine"] path{transform:scale(.94)}
-[data-wb-nav][aria-selected="true"]{font-weight:600;background:rgba(251,114,153,.1)}
-[data-wb-nav][aria-selected="true"]::before{display:none}
+[data-wb-nav][aria-current="page"]{font-weight:600;background:var(--wb-acc-soft2)}
+[data-wb-nav][aria-current="page"]::before{display:none}
 [data-wb-main]{padding:26px 28px 36px;background:color-mix(in srgb,var(--wb-tx) 2%,var(--wb-bg))}
 [data-wb-page]{gap:20px;margin:0 auto}
 [data-wb-head]{margin-bottom:2px;gap:14px}
-[data-wb-title]{font-size:21px;font-weight:650;letter-spacing:.01em}
-[data-wb-sub]{font-size:12px;color:var(--wb-dim);margin-top:6px;line-height:1.7}
-[data-wb-sec]{padding:20px;border-radius:8px;gap:14px}
-[data-wb-h]{font-size:13px;letter-spacing:0;color:var(--wb-tx);font-weight:600}
-[data-wb-btn]{border-radius:5px;background:transparent;padding:8px 15px;font-size:13px;transition:background .15s,border-color .15s}
+[data-wb-title]{font-size:var(--wb-fs-lg);font-weight:650;letter-spacing:.01em}
+[data-wb-sub]{font-size:var(--wb-fs-xs);color:var(--wb-dim);margin-top:6px;line-height:1.7}
+[data-wb-sec]{padding:20px;border-radius:var(--wb-r-sm);gap:14px}
+[data-wb-h]{font-size:var(--wb-fs-sm);letter-spacing:0;color:var(--wb-tx);font-weight:600}
+[data-wb-btn]{border-radius:var(--wb-r-sm);background:transparent;padding:8px 15px;font-size:var(--wb-fs-sm);transition:background .15s,border-color .15s}
 [data-wb-btn]:hover:not(:disabled){background:var(--wb-card2);border-color:var(--wb-acc)}
 [data-wb-btn][data-primary]:hover:not(:disabled){background:#ed648d}
 [data-wb-btn]:focus-visible,[data-wb-nav]:focus-visible,summary:focus-visible{outline:2px solid var(--wb-acc);outline-offset:3px}
+[data-wb-chip][role=button]:focus-visible,[data-wb-tagdel]:focus-visible{outline:2px solid var(--wb-acc);outline-offset:2px}
 [data-wb-btn][data-sm]{padding:6px 11px}
-[data-wb-input],[data-wb-search]{border-radius:6px;font-size:13px;background:var(--wb-bg);line-height:1.7}
+[data-wb-input],[data-wb-search]{border-radius:var(--wb-r-sm);font-size:var(--wb-fs-sm);background:var(--wb-bg);line-height:1.7}
 [data-wb-searchwrap]{max-width:none;margin:0 0 4px}
-[data-wb-chip],[data-wb-badge],[data-wb-tier],[data-wb-cmt]{border-radius:4px;font-weight:400}
-[data-wb-note],[data-wb-meta]{font-size:12px;color:var(--wb-dim);line-height:1.7}
-[data-wb-projtitle]{font-size:16px;font-weight:600;line-height:1.6}
-[data-wb-card]{border-radius:8px}
+[data-wb-chip],[data-wb-badge],[data-wb-tier],[data-wb-cmt]{border-radius:var(--wb-r-xs);font-weight:400}
+[data-wb-note],[data-wb-meta]{font-size:var(--wb-fs-xs);color:var(--wb-dim);line-height:1.7}
+[data-wb-projtitle]{font-size:var(--wb-fs-md);font-weight:600;line-height:1.6}
+[data-wb-card]{border-radius:var(--wb-r-sm)}
+/* 封面占位固定用中性深灰：上面压 85% 白字，深浅两种模式都不能跟随主题变浅。 */
 [data-wb-cover]{background:#303945}
 [data-wb-body]{padding:14px;gap:10px}
-[data-wb-mat]{border-radius:8px;padding:16px}
+[data-wb-mat]{border-radius:var(--wb-r-sm);padding:16px}
 [data-wb-bar]{height:4px}
 [data-wb-bar] i{background:var(--wb-acc)}
 [data-wb-empty]{border:0;padding:52px 20px}
@@ -363,13 +394,13 @@ window.__ModuleLoader__.load({
 [data-wb-style] button{flex:1 1 140px;text-align:left;white-space:normal;padding:11px 13px}
 [data-wb-style] button[data-primary]{color:var(--wb-tag-sel-fg);background:var(--wb-tag-sel-bg);border-color:var(--wb-tag-sel-bd);font-weight:400}
 [data-wb-style] button[data-primary]:hover:not(:disabled){background:var(--wb-tag-sel-bg);border-color:var(--wb-tag-sel-fg)}
-[data-wb-style] [data-wb-note]{font-size:11px;margin-top:4px}
+[data-wb-style] [data-wb-note]{font-size:var(--wb-fs-2xs);margin-top:4px}
 [data-wb-edit]{border-top:1px solid var(--wb-line);padding-top:12px}
-[data-wb-task-history]>summary{cursor:pointer;font-size:13px;font-weight:600;color:var(--wb-dim)}
+[data-wb-task-history]>summary{cursor:pointer;font-size:var(--wb-fs-sm);font-weight:600;color:var(--wb-dim)}
 [data-wb-task-history][open]>summary{margin-bottom:4px}
-[data-wb-edit]>summary{cursor:pointer;color:var(--wb-dim);font-size:13px;width:fit-content;padding:4px 0}
+[data-wb-edit]>summary{cursor:pointer;color:var(--wb-dim);font-size:var(--wb-fs-sm);width:fit-content;padding:4px 0}
 [data-wb-edit][open]>summary{color:var(--wb-acc-text);margin-bottom:14px}
-[data-wb-fold]>summary{cursor:pointer;width:fit-content;padding:4px 0;font-size:12px;color:var(--wb-dim);list-style:none}
+[data-wb-fold]>summary{cursor:pointer;width:fit-content;padding:4px 0;font-size:var(--wb-fs-xs);color:var(--wb-dim);list-style:none}
 [data-wb-fold]>summary::-webkit-details-marker{display:none}
 [data-wb-fold]>summary::before{content:"▸ "}
 [data-wb-fold][open]>summary::before{content:"▾ "}
@@ -384,33 +415,35 @@ window.__ModuleLoader__.load({
 [data-wb-cover] [data-wb-badge],[data-wb-cover] [data-wb-tier]{box-shadow:0 0 0 1px rgba(15,17,21,.1),0 1px 3px rgba(0,0,0,.28)}
 
 /* 紧凑方案列表：标题、元信息、内容与操作各占一行。 */
-[data-wb-project-card]{gap:10px;padding:18px 20px;border-radius:7px}
+[data-wb-project-card]{gap:10px;padding:18px 20px;border-radius:var(--wb-r-sm)}
 [data-wb-project-head]{display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap}
-[data-wb-project-head] [data-wb-projtitle]{flex:1;min-width:220px;font-size:15px;line-height:1.6;font-weight:600}
+[data-wb-project-head] [data-wb-projtitle]{flex:1;min-width:220px;font-size:var(--wb-fs-md);line-height:1.6;font-weight:600}
 [data-wb-project-head] [data-wb-badge]{margin-top:2px;line-height:1.7}
-[data-wb-version]{padding:4px 7px;border:1px solid var(--wb-line);border-radius:4px;background:var(--wb-bg);color:var(--wb-dim);font:inherit;font-size:12px;line-height:1.5;max-width:150px}
-[data-wb-plan-angle]{font-size:13px;line-height:1.7;color:var(--wb-dim);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+[data-wb-version]{padding:4px 7px;border:1px solid var(--wb-line);border-radius:var(--wb-r-xs);background:var(--wb-bg);color:var(--wb-dim);font:inherit;font-size:var(--wb-fs-xs);line-height:1.5;max-width:150px}
+[data-wb-plan-angle]{font-size:var(--wb-fs-sm);line-height:1.7;color:var(--wb-dim);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 [data-wb-project-actions]{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding-top:11px;border-top:1px solid var(--wb-line);margin-top:2px}
-[data-wb-project-actions] [data-wb-btn]{font-size:12px;padding:5px 10px}
+[data-wb-project-actions] [data-wb-btn]{font-size:var(--wb-fs-xs);padding:5px 10px}
 [data-wb-project-actions] [data-wb-danger-link]{color:var(--wb-dim);border-color:transparent;padding-right:0}
-[data-wb-project-actions] [data-wb-danger-link]:hover{color:var(--wb-red)}
-[data-wb-delete-confirm]{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:12px 14px;border:1px solid rgba(239,68,68,.3);border-radius:5px;background:rgba(239,68,68,.05);font-size:13px}
-[data-wb-btn][data-wb-danger]{color:#fff;background:#d94a4a;border-color:#d94a4a}
-[data-wb-btn][data-wb-danger]:hover:not(:disabled){background:#bd3939}
-[data-wb-edit-panel]{padding:14px;background:var(--wb-card2);border-radius:5px;display:flex;flex-direction:column;gap:12px}
+[data-wb-project-actions] [data-wb-danger-link]:hover{color:var(--wb-danger-text)}
+[data-wb-btn][data-wb-danger]{color:#fff;background:var(--wb-danger);border-color:var(--wb-danger)}
+[data-wb-btn][data-wb-danger]:hover:not(:disabled){background:var(--wb-danger-hover)}
+/* 两步确认的待确认态：第一次点击只把按钮转成危险色，4 秒内再点才真执行（与删除成片同一套口径）。
+   带上 :hover 是为了压过 [data-primary]:hover 的粉色填充。 */
+[data-wb-btn][data-arm],[data-wb-btn][data-arm]:hover:not(:disabled){color:var(--wb-danger-text);border-color:var(--wb-danger-line);background:var(--wb-danger-bg)}
+[data-wb-edit-panel]{padding:14px;background:var(--wb-card2);border-radius:var(--wb-r-sm);display:flex;flex-direction:column;gap:12px}
 [data-wb-new-project]{gap:12px;padding:18px 20px}
 [data-wb-new-project] textarea[data-area]{min-height:72px}
 [data-wb-compose-foot]{display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap}
 [data-wb-compose-foot]>[data-wb-col]{flex:1;min-width:260px}
 [data-wb-compose-foot]>[data-wb-btn]{margin-left:auto;flex:none}
-[data-wb-compose-hint]{flex-basis:100%;font-size:11px}
+[data-wb-compose-hint]{flex-basis:100%;font-size:var(--wb-fs-2xs)}
 [data-wb-style]{gap:6px}
-[data-wb-style] button{flex:0 1 auto;min-width:0!important;padding:6px 10px;font-size:12px;text-align:center}
+[data-wb-style] button{flex:0 1 auto;min-width:0!important;padding:6px 10px;font-size:var(--wb-fs-xs);text-align:center}
 [data-wb-page]{gap:16px}
 @media(max-width:820px){[data-wb-project-card],[data-wb-new-project]{padding:15px}[data-wb-project-head] [data-wb-projtitle]{min-width:150px}[data-wb-project-actions]{gap:6px}}
 
 /* 表单统一尺寸、焦点与禁用态；不改变自动互动等开关的业务含义。 */
-[data-wb-root] input[type=checkbox],[data-wb-root] input[type=radio]{appearance:none;-webkit-appearance:none;display:inline-grid;place-content:center;width:16px;height:16px;min-width:16px;margin:0;border:1px solid var(--wb-dim2);border-radius:4px;background:var(--wb-bg);vertical-align:middle;cursor:pointer;transition:background .15s,border-color .15s}
+[data-wb-root] input[type=checkbox],[data-wb-root] input[type=radio]{appearance:none;-webkit-appearance:none;display:inline-grid;place-content:center;width:16px;height:16px;min-width:16px;margin:0;border:1px solid var(--wb-dim2);border-radius:var(--wb-r-xs);background:var(--wb-bg);vertical-align:middle;cursor:pointer;transition:background .15s,border-color .15s}
 [data-wb-root] input[type=checkbox]:checked{background:var(--wb-acc);border-color:var(--wb-acc)}
 [data-wb-root] input[type=checkbox]:checked::before{content:"";width:7px;height:4px;border-left:2px solid #fff;border-bottom:2px solid #fff;transform:translateY(-1px) rotate(-45deg)}
 [data-wb-root] input[type=radio]{border-radius:50%}
@@ -420,26 +453,48 @@ window.__ModuleLoader__.load({
 [data-wb-root] input:disabled{opacity:.45;cursor:not-allowed}
 [data-wb-toggle]{min-height:28px;line-height:1.7;align-items:center;color:var(--wb-tx)}
 [data-wb-toggle]:has(input:disabled){opacity:.65;cursor:not-allowed}
-[data-wb-input]{min-height:34px;padding:6px 10px;border-radius:5px;font-size:13px}
-[data-wb-input]:focus{box-shadow:0 0 0 2px rgba(251,114,153,.12)}
+[data-wb-input]{min-height:34px;padding:6px 10px;border-radius:var(--wb-r-sm);font-size:var(--wb-fs-sm)}
+[data-wb-input]:focus{box-shadow:0 0 0 2px var(--wb-acc-soft2)}
 [data-wb-input][data-num]{font-variant-numeric:tabular-nums;min-width:66px}
 [data-wb-select-wrap]{display:inline-block;position:relative;max-width:100%;min-width:108px;flex-shrink:0}
-[data-wb-select]{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:34px;padding:6px 10px;border:1px solid var(--wb-line);border-radius:5px;background:var(--wb-bg);color:var(--wb-tx);font:inherit;font-size:13px;line-height:1.5;cursor:pointer;text-align:left}
+[data-wb-select]{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;min-height:34px;padding:6px 10px;border:1px solid var(--wb-line);border-radius:var(--wb-r-sm);background:var(--wb-bg);color:var(--wb-tx);font:inherit;font-size:var(--wb-fs-sm);line-height:1.5;cursor:pointer;text-align:left}
 [data-wb-select]>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 [data-wb-select] svg{flex:none;color:var(--wb-dim)}
 [data-wb-select][aria-expanded=true],[data-wb-select]:hover:not(:disabled){border-color:var(--wb-acc)}
 [data-wb-select]:focus-visible{outline:2px solid var(--wb-acc);outline-offset:2px}
 [data-wb-select]:disabled{opacity:.45;cursor:not-allowed}
-[data-wb-select][data-wb-version]{max-width:none;min-height:30px;font-size:12px;color:var(--wb-dim)}
-[data-wb-select-menu]{position:absolute;left:0;top:calc(100% + 5px);z-index:50;min-width:100%;width:max-content;max-width:280px;overflow:auto;padding:4px;border:1px solid var(--wb-line);border-radius:6px;background:var(--wb-panel);box-shadow:0 6px 20px rgba(0,0,0,.2)}
+[data-wb-select][data-wb-version]{max-width:none;min-height:30px;font-size:var(--wb-fs-xs);color:var(--wb-dim)}
+[data-wb-select-menu]{position:absolute;left:0;top:calc(100% + 5px);z-index:50;min-width:100%;width:max-content;max-width:280px;overflow:auto;padding:4px;border:1px solid var(--wb-line);border-radius:var(--wb-r-sm);background:var(--wb-panel);box-shadow:0 6px 20px rgba(0,0,0,.2)}
 [data-wb-select-menu][data-up]{top:auto;bottom:calc(100% + 5px)}
-[data-wb-select-menu] [role=option]{display:flex;align-items:center;justify-content:space-between;gap:18px;min-height:32px;padding:6px 9px;border-radius:4px;font-size:13px;line-height:1.5;cursor:pointer;color:var(--wb-tx)}
+[data-wb-select-menu] [role=option]{display:flex;align-items:center;justify-content:space-between;gap:18px;min-height:32px;padding:6px 9px;border-radius:var(--wb-r-xs);font-size:var(--wb-fs-sm);line-height:1.5;cursor:pointer;color:var(--wb-tx)}
 [data-wb-select-menu] [role=option][data-active=true]{background:var(--wb-card2)}
-[data-wb-select-menu] [role=option][aria-selected=true]{color:var(--wb-acc);background:rgba(251,114,153,.1)}
+[data-wb-select-menu] [role=option][aria-selected=true]{color:var(--wb-acc);background:var(--wb-acc-soft2)}
 [data-wb-select-menu] [role=option][aria-disabled=true]{opacity:.4;cursor:not-allowed}
 [data-wb-style] [role=radio]{display:flex;align-items:center;gap:7px}
 [data-wb-style] [role=radio]::before{content:"";width:12px;height:12px;border:1px solid var(--wb-dim2);border-radius:50%;flex:none}
 [data-wb-style] [role=radio][aria-checked=true]::before{border:4px solid var(--wb-tag-sel-fg);background:var(--wb-bg)}
+
+/* 关注关键词：一行一条（关键词 / 类型 / 精度 / 权重滑块 / 删除），窄屏自动换行。 */
+[data-wb-kwlist]{display:flex;flex-direction:column;gap:6px}
+[data-wb-kwrow]{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+[data-wb-kwrow] [data-wb-input]{flex:1 1 120px;min-width:110px;max-width:260px}
+[data-wb-kwrow] [data-wb-select-wrap]{min-width:80px;width:80px;flex:none}
+[data-wb-kww]{display:flex;align-items:center;gap:6px;font-size:var(--wb-fs-xs);color:var(--wb-dim);flex:none}
+/* 滑块自己画：浏览器默认轨道在浅色下是一根近黑的粗条，跟这套配色完全不搭。
+   输入框本身体高 18px（可点可拖），视觉轨道只有 4px；填充量由内联的 --wb-fill 控制。 */
+[data-wb-kww] input[type=range]{appearance:none;-webkit-appearance:none;width:88px;height:18px;margin:0;cursor:pointer;background:transparent}
+[data-wb-kww] input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:999px;background:linear-gradient(90deg,var(--wb-acc) var(--wb-fill,50%),var(--wb-line) var(--wb-fill,50%))}
+[data-wb-kww] input[type=range]::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:14px;height:14px;margin-top:-5px;border:0;border-radius:50%;background:var(--wb-acc);box-shadow:0 0 0 2px var(--wb-card),0 1px 3px rgba(15,17,21,.35);cursor:pointer}
+[data-wb-kww] input[type=range]::-moz-range-track{height:4px;border-radius:999px;background:var(--wb-line)}
+[data-wb-kww] input[type=range]::-moz-range-progress{height:4px;border-radius:999px;background:var(--wb-acc)}
+[data-wb-kww] input[type=range]::-moz-range-thumb{width:14px;height:14px;border:0;border-radius:50%;background:var(--wb-acc);box-shadow:0 0 0 2px var(--wb-card)}
+[data-wb-kww] input[type=range]:focus-visible{outline:2px solid var(--wb-acc);outline-offset:2px}
+[data-wb-kww] span{font-variant-numeric:tabular-nums;min-width:36px;text-align:right}
+/* 工作台标签页里藏掉宿主的底部输入座位和内容宽度拖拽把手：它们属于「整个会话」，
+   不随标签切换消失，留着既挡住工作台高度，拖宽时还会把内容拉到全屏。
+   标记由 Shell 挂载时打到 [data-conversation-region="chat"] 上，切回对话标签即移除。 */
+[data-wb-view] [data-composer-seat]{display:none!important}
+[data-wb-view] [class*="widthHandle"]{display:none!important}
 `
 
     /* ── 小组件 ── */
@@ -451,12 +506,15 @@ window.__ModuleLoader__.load({
       settings: 'M12 3v3 M12 18v3 M3 12h3 M18 12h3 M5.6 5.6l2.1 2.1 M16.3 16.3l2.1 2.1 M5.6 18.4l2.1-2.1 M16.3 7.7l2.1-2.1 M17 12a5 5 0 1 1-10 0 5 5 0 0 1 10 0',
       mine: 'M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0 M4 21v-2a8 8 0 0 1 16 0v2',
       empty: 'M4 5h16v15H4z M8 10h8 M8 14h5',
+      search: 'M10.5 4a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13z M15.5 15.5 20 20',
     }
     const Icon = ({ name = 'empty' }) => h('svg', { 'data-i': name, width: 20, height: 20, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.6, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true }, h('path', { d: ICON_PATHS[name] || ICON_PATHS.empty }))
     const Btn = ({ primary, sm, children, ...rest }) => h('button', {
       ...rest, 'data-wb-btn': '', 'data-primary': primary ? '' : undefined, 'data-sm': sm ? '' : undefined,
     }, children)
     let selectSequence = 0
+    /** 设置页有未保存改动时置位：切标签/关页面都要拦一下，避免改了半天无声丢掉 */
+    let settingsDirty = false
     /** 统一下拉控件；保留select的value/onChange契约，不依赖系统弹出菜单。 */
     function Select({ value, onChange, children, disabled, style, ...rest }) {
       const options = React.Children.toArray(children).filter(React.isValidElement).map(el => ({ value: String(el.props.value), label: el.props.children, disabled: Boolean(el.props.disabled) }))
@@ -557,6 +615,24 @@ window.__ModuleLoader__.load({
           ...items.slice(limit)))
     }
 
+    /** 弹层：统一点击遮罩/Esc/关闭按钮关闭，并补齐 dialog 语义与焦点 */
+    const Overlay = ({ label, onClose, children }) => {
+      const ref = useRef(null)
+      useEffect(() => {
+        const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); onClose() } }
+        window.addEventListener('keydown', onKey)
+        ref.current?.focus()
+        return () => window.removeEventListener('keydown', onKey)
+      }, [onClose])
+      return h('div', {
+        'data-wb-overlay': '', role: 'dialog', 'aria-modal': 'true', 'aria-label': label,
+        tabIndex: -1, ref,
+        onClick: (e) => { if (e.target === e.currentTarget) onClose() },
+      },
+        h('button', { className: 'x', 'aria-label': '关闭', onClick: onClose }, '✕'),
+        children)
+    }
+
     /* ═══════════════════ ① 素材库 ═══════════════════ */
     function StoreRow({ r, onDetail }) {
       const quotes = r.quotes || []
@@ -596,34 +672,45 @@ window.__ModuleLoader__.load({
 
     function TabStore() {
       const [q, setQ] = useState('')
+      const [tier, setTier] = useState('')
+      const [debounced, setDebounced] = useState('')
       const [view, setView] = useState('list')
       const [open, setOpen] = useState('')
-      const list = useApi('/store/list?limit=300')
+      // 搜索走服务端（原来只在前 300 条里筛，库大了老素材搜不到）；输入停 300ms 再发请求
+      useEffect(() => {
+        const t = setTimeout(() => setDebounced(q.trim()), 300)
+        return () => clearTimeout(t)
+      }, [q])
+      const listUrl = `/store/list?limit=300&fields=card${tier ? `&tier=${encodeURIComponent(tier)}` : ''}${debounced ? `&q=${encodeURIComponent(debounced)}` : ''}`
+      const list = useApi(listUrl)
       const detail = useApi(open ? '/store/item?bv=' + encodeURIComponent(open) : '', { auto: Boolean(open) })
-      const rows = (list.data?.rows || []).filter((r) => {
-        if (!q.trim()) return true
-        const k = q.trim().toLowerCase()
-        return [r.title, r.up?.name, r.judge?.why, ...(r.quotes || []).map((x) => x.text)]
-          .some((s) => String(s || '').toLowerCase().includes(k))
-      })
+      const rows = list.data?.rows || []
+      const filtered = Boolean(debounced || tier)
       const rec = detail.data?.record
       const sub = detail.data?.subtitles
 
       return h('div', { 'data-wb-page': '' },
         h(PageHead, { title: '素材库', sub: '从视频里收集的素材：点评 + 时间点片段 + 关键帧' },
-          h('input', { 'data-wb-search': '', style: { maxWidth: '260px' }, placeholder: '在库里搜标题 / 点评 / 金句…', value: q, onChange: (e) => setQ(e.target.value) }),
+          h('input', {
+            'data-wb-search': '', 'aria-label': '在素材库里搜索', style: { maxWidth: '260px' },
+            placeholder: '在库里搜标题 / 点评 / 金句…', value: q, onChange: (e) => setQ(e.target.value),
+          }),
           h(Btn, { sm: true, onClick: list.reload }, '刷新'),
           h(Btn, { sm: true, onClick: () => setView(view === 'list' ? 'cards' : 'list') }, view === 'list' ? '卡片视图' : '列表视图')),
+        h('div', { 'data-wb-row': '', 'aria-label': '按档位筛选' },
+          ...[['', '全部'], ['值得看', '值得看'], ['可以看', '可以看'], ['跳过', '跳过'], ['未判定', '未判定']].map(([k, name]) =>
+            h(Btn, { key: k || 'all', sm: true, primary: tier === k, 'aria-pressed': tier === k, onClick: () => setTier(k) }, name))),
         h('div', { 'data-wb-row': '' },
           h(Chip, {}, `库内 ${list.data?.stats?.videos ?? rows.length} 条 · ${list.data?.stats?.mb ?? '-'} MB`),
+          filtered ? h(Chip, { ok: true }, `筛出 ${rows.length} 条`) : null,
           h('div', { 'data-wb-grow': '' }),
           h(Note, {}, '档位来自「刷B站」的判定')),
         h(Err, {}, list.err),
         list.loading ? h('div', { 'data-wb-loading': '' }, '读素材库…') : null,
         !list.loading && !rows.length ? h(Empty, {
-          icon: q.trim() ? '🔍' : 'store',
-          title: q.trim() ? '没搜到' : '素材库还是空的',
-          hint: q.trim() ? '换个词试试，或者清空搜索框看全部。' : '去「刷B站」采几条，或在视频卡片上点「看懂视频」。',
+          icon: filtered ? 'search' : 'store',
+          title: debounced ? '没搜到' : tier ? '这个档位还没有素材' : '素材库还是空的',
+          hint: debounced ? '换个词试试，或者清空搜索框看全部。' : tier ? '换个档位，或等下一轮采集 / 判定。' : '去「刷B站」采几条，或在视频卡片上点「看懂视频」。',
         }) : null,
 
         view === 'list'
@@ -645,11 +732,7 @@ window.__ModuleLoader__.load({
               h('div', { 'data-wb-row': '' },
                 h(Btn, { sm: true, onClick: () => setOpen(r.bvid) }, '详情')))))),
 
-        open ? h('div', {
-          'data-wb-overlay': '',
-          onClick: (e) => { if (e.target === e.currentTarget) setOpen('') },
-        },
-          h('button', { className: 'x', onClick: () => setOpen('') }, '✕'),
+        open ? h(Overlay, { label: '素材详情', onClose: () => setOpen('') },
           h('div', { 'data-wb-sec': '', style: { width: 'min(920px, 96%)', maxHeight: '88%', overflow: 'auto', margin: 0 } },
             detail.loading ? h('div', { 'data-wb-loading': '' }, '读取详情…') : null,
             detail.err ? h(Err, {}, detail.err) : null,
@@ -685,6 +768,9 @@ window.__ModuleLoader__.load({
       const [busy, setBusy] = useState('')
       const [dump, setDump] = useState('')
       const [real, setReal] = useState(false)
+      const [arm, setArm] = useState(false)
+      const armTimer = useRef(null)
+      useEffect(() => () => clearTimeout(armTimer.current), [])
       const label = kind === 'comment' ? '评论' : kind === 'reply' ? '回复' : '私信'
 
       const genText = async () => {
@@ -697,8 +783,17 @@ window.__ModuleLoader__.load({
         } else setDump('生成失败：' + (errText(r) || ''))
       }
       useEffect(() => { genText() }, [])
+      /* 真发送走两步确认：第一次点只把按钮变红，4 秒内再点才发出去；dry-run 不拦 */
       const send = async () => {
         if (!text.trim()) return
+        if (real && !arm) {
+          setArm(true)
+          clearTimeout(armTimer.current)
+          armTimer.current = setTimeout(() => setArm(false), 4000)
+          return
+        }
+        clearTimeout(armTimer.current)
+        setArm(false)
         setBusy('send')
         const r = await jpost('/interact/send', { kind, text, confirm: true, dryRun: !real, ...(target.ids || {}) })
         setBusy('')
@@ -720,10 +815,13 @@ window.__ModuleLoader__.load({
         }),
         h('div', { 'data-wb-row': '' },
           h('label', { 'data-wb-toggle': '' },
-            h('input', { type: 'checkbox', checked: real, onChange: (e) => setReal(e.target.checked) }),
+            h('input', { type: 'checkbox', checked: real, onChange: (e) => { setReal(e.target.checked); setArm(false) } }),
             h('span', {}, '确认发送（不勾选时仅检查）')),
           h('div', { 'data-wb-grow': '' }),
-          h(Btn, { sm: true, primary: true, disabled: gen || busy === 'send' || !text.trim(), onClick: send }, busy === 'send' ? '发送中…' : '发送'),
+          h(Btn, {
+            sm: true, primary: true, disabled: gen || busy === 'send' || !text.trim(),
+            'data-arm': real && arm ? '' : undefined, onClick: send,
+          }, busy === 'send' ? '发送中…' : !real ? '发送（仅检查）' : arm ? '确认发送？' : '发送'),
           h(Btn, { sm: true, disabled: gen || busy === 'p', onClick: async () => { setBusy('p'); await genText(); setBusy('') } }, '重新生成')),
         dump ? h('pre', { 'data-wb-pre': '' }, dump) : null)
     }
@@ -753,26 +851,36 @@ window.__ModuleLoader__.load({
     function SubVideo({ storeMap, cfg, onCommented, onKeywordsChanged }) {
       const [q, setQ] = useState('')
       const [key, setKey] = useState('')
+      const [kwMode, setKwMode] = useState({ kind: 'content', precision: 'loose' })
       const [detail, setDetail] = useState('')
       const [comment, setComment] = useState(null)
       const [editTags, setEditTags] = useState(false)
       const pressRef = useRef(null)
       const suppressRef = useRef(false)
       const hot = useApi(key ? '' : '/hot?size=24', { auto: !key })
-      const search = useApi(key ? `/search?q=${encodeURIComponent(key)}&size=24` : '', { auto: Boolean(key) })
+      const search = useApi(key
+        ? `/search?q=${encodeURIComponent(key)}&size=24&kind=${kwMode.kind}&precision=${kwMode.precision}`
+        : '', { auto: Boolean(key) })
       const watch = useApi(detail ? '/video?bv=' + encodeURIComponent(detail) : '', { auto: Boolean(detail) })
       const items = key ? (search.data?.items || []) : (hot.data?.items || [])
       const loading = key ? search.loading : hot.loading
       const err = key ? search.err : hot.err
       const d = watch.data?.data
 
-      const keywords = cfg?.keywords || []
+      // 权重高的排前面：手动刷的时候也按重要程度排
+      const keywords = (cfg?.keywords || []).map(kwOf).filter((k) => k.text).sort((a, b) => b.weight - a.weight)
       const cancelPress = () => {
         if (pressRef.current) { clearTimeout(pressRef.current); pressRef.current = null }
       }
       const startPress = () => {
         cancelPress()
         pressRef.current = setTimeout(() => { suppressRef.current = true; setEditTags(true) }, 550)
+      }
+      /* 关键词是 span，键盘用户拿不到焦点，只能自己补 role/tabIndex；空格和回车都当点击 */
+      const chipKey = (fn) => (e) => {
+        if (e.key !== 'Enter' && e.key !== ' ') return
+        e.preventDefault()
+        fn()
       }
       const saveKeywords = async (next) => {
         const r = await jpost('/config', { keywords: next })
@@ -781,16 +889,15 @@ window.__ModuleLoader__.load({
         return true
       }
       const delKeyword = async (k) => {
-        const next = keywords.filter((x) => x !== k)
-        if (await saveKeywords(next) && key === k) { setKey(''); setQ('') }
+        const next = keywords.filter((x) => x.text !== k.text)
+        if (await saveKeywords(next) && key === k.text) { setKey(''); setQ('') }
       }
       const addKeyword = async () => {
         const v = String(prompt('加一个关注关键词：') || '').trim()
         if (!v) return
-        if (!keywords.includes(v)) {
-          if (!await saveKeywords([...keywords, v])) return
-        }
-        setQ(v); setKey(v)
+        const exists = keywords.some((x) => x.text === v)
+        if (!exists && !await saveKeywords([...keywords, { text: v, kind: 'content', precision: 'loose', weight: 50 }])) return
+        setQ(v); setKey(v); setKwMode({ kind: 'content', precision: 'loose' })
       }
       const openComment = (it) => {
         const rec = storeMap[it.bvid] || {}
@@ -812,14 +919,24 @@ window.__ModuleLoader__.load({
           h('input', {
             'data-wb-search': '', placeholder: '搜视频、UP、关键词…', value: q,
             onChange: (e) => setQ(e.target.value),
-            onKeyDown: (e) => { if (e.key === 'Enter') setKey(q.trim()) },
+            // 手打的搜索一律按「内容 · 宽松」查，关键词条的设置只作用于点标签
+            onKeyDown: (e) => { if (e.key === 'Enter') { setKey(q.trim()); setKwMode({ kind: 'content', precision: 'loose' }) } },
           }),
           h('span', { className: 'kbd' }, 'Enter')),
         h('div', { 'data-wb-row': '', style: { justifyContent: 'center', marginBottom: '6px' } },
-          h('span', { 'data-wb-chip': '', 'data-sel': key ? undefined : '', style: { cursor: 'pointer' }, onClick: () => { if (editTags) return; setKey(''); setQ('') } }, '热门'),
+          h('span', {
+            /* 编辑关键词时整枚 chip 不响应点击，就不该再是按钮（否则焦点落在无操作的控件上） */
+            role: editTags ? undefined : 'button', tabIndex: editTags ? undefined : 0,
+            'aria-pressed': editTags ? undefined : !key,
+            'data-wb-chip': '', 'data-sel': key ? undefined : '', style: { cursor: 'pointer' },
+            onClick: () => { if (editTags) return; setKey(''); setQ('') },
+            onKeyDown: chipKey(() => { if (editTags) return; setKey(''); setQ('') }),
+          }, '热门'),
           ...keywords.map((k) => h('span', {
-            key: k, 'data-wb-chip': '', 'data-wb-tag': '',
-            'data-sel': key === k ? '' : undefined,
+            key: k.text, role: editTags ? undefined : 'button', tabIndex: editTags ? undefined : 0,
+            'aria-pressed': editTags ? undefined : key === k.text,
+            'data-wb-chip': '', 'data-wb-tag': '', title: kwHint(k),
+            'data-sel': key === k.text ? '' : undefined,
             style: {
               cursor: 'pointer', position: 'relative',
               borderStyle: editTags ? 'dashed' : undefined,
@@ -832,10 +949,15 @@ window.__ModuleLoader__.load({
             onClick: () => {
               if (suppressRef.current) { suppressRef.current = false; return }
               if (editTags) return
-              setKey(k); setQ(k)
+              setKey(k.text); setQ(k.text); setKwMode({ kind: k.kind, precision: k.precision })
             },
-          }, k, editTags ? h('span', {
+            onKeyDown: chipKey(() => {
+              if (editTags) return
+              setKey(k.text); setQ(k.text); setKwMode({ kind: k.kind, precision: k.precision })
+            }),
+          }, kwLabel(k), editTags ? h('span', {
             'data-wb-tagdel': '',
+            role: 'button', tabIndex: 0, 'aria-label': `删除关键词 ${k.text}`,
             style: {
               position: 'absolute', top: '-7px', right: '-7px', width: '14px', height: '14px',
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -844,13 +966,25 @@ window.__ModuleLoader__.load({
             },
             onPointerDown: (e) => e.stopPropagation(),
             onClick: (e) => { e.stopPropagation(); delKeyword(k) },
+            onKeyDown: chipKey(() => delKeyword(k)),
           }, '×') : null)),
-          h('span', { 'data-wb-chip': '', style: { cursor: 'pointer' }, onClick: () => { if (!editTags) addKeyword() } }, '+ 关键词')),
-        editTags ? h(Note, {}, '点标签右上角 × 删除 · 点空白处退出') : null,
+          h('span', {
+            role: editTags ? undefined : 'button', tabIndex: editTags ? undefined : 0, title: kwTip,
+            'data-wb-chip': '', style: { cursor: 'pointer' },
+            onClick: () => { if (!editTags) addKeyword() },
+            onKeyDown: chipKey(() => { if (!editTags) addKeyword() }),
+          }, '+ 关键词')),
+        editTags ? h(Note, {}, '点标签右上角 × 删除 · 点空白处退出；权重 / 类型 / 精度去「刷B站设置」里调') : null,
         h('div', { 'data-wb-row': '' },
-          h(Note, {}, key ? `搜索：${key}` : '综合热门'),
+          h(Note, {}, key
+            ? `搜索：${kwMode.kind === 'up' ? '@' : ''}${key}${kwMode.precision === 'exact' ? ' · 精确匹配' : ''}`
+            : '综合热门'),
           h('div', { 'data-wb-grow': '' }),
           h(Btn, { sm: true, onClick: key ? search.reload : hot.reload }, '刷新')),
+        key && search.data?.hint ? h(Note, {}, search.data.hint) : null,
+        key && search.data?.ok && !items.length && !loading ? h(Note, {}, kwMode.precision === 'exact'
+          ? '精确匹配没有命中：这个关键词可能太窄，可以去「刷B站设置」改成宽松。'
+          : '没有搜到结果，换个词试试。') : null,
         comment ? h(InteractComposer, {
           key: comment.ids?.bv || 'comment',
           kind: 'comment', target: comment,
@@ -859,11 +993,7 @@ window.__ModuleLoader__.load({
         }) : null,
         h(Err, {}, err),
         loading ? h('div', { 'data-wb-loading': '' }, '读取中…') : null,
-        detail ? h('div', {
-          'data-wb-overlay': '',
-          onClick: (e) => { if (e.target === e.currentTarget) setDetail('') },
-        },
-          h('button', { className: 'x', onClick: () => setDetail('') }, '✕'),
+        detail ? h(Overlay, { label: '视频详情', onClose: () => setDetail('') },
           h('div', { 'data-wb-sec': '', style: { width: 'min(920px, 96%)', maxHeight: '88%', overflow: 'auto', margin: 0 } },
             watch.loading ? h('div', { 'data-wb-loading': '' }, '读取视频…') : null,
             watch.err ? h(Err, {}, watch.err) : null,
@@ -889,6 +1019,9 @@ window.__ModuleLoader__.load({
     function SubInbox({ onCommented, cfg }) {
       const inbox = useApi('/inbox')
       const ownerTasks = useApi('/owner/tasks')
+      // 自动回复后台每 3 分钟跑一轮，页面自己刷新，不然要手点才看得到新消息
+      usePoll(inbox.reload, 30000, true)
+      usePoll(ownerTasks.reload, 60000, true)
       const [composer, setComposer] = useState(null)
       const [taskOpen, setTaskOpen] = useState('')
       const [taskMsg, setTaskMsg] = useState('')
@@ -945,8 +1078,7 @@ window.__ModuleLoader__.load({
             h('div', { 'data-wb-grow': '' }),
             h(Btn, { sm: true, onClick: () => setTaskOpen(t.id) }, '查看'))),
           !(ownerTasks.data?.tasks || []).length ? h(Note, {}, '还没有主人请求。在主人在视频评论里 @ 它，这里会出现。') : null),
-        task ? h('div', { 'data-wb-overlay': '', onClick: (e) => { if (e.target === e.currentTarget) setTaskOpen('') } },
-          h('button', { className: 'x', onClick: () => setTaskOpen('') }, '✕'),
+        task ? h(Overlay, { label: '主人请求详情', onClose: () => setTaskOpen('') },
           h('div', { 'data-wb-sec': '', style: { width: 'min(860px, 96%)', maxHeight: '88%', overflow: 'auto', margin: 0 } },
             h('div', { 'data-wb-row': '' },
               h('b', {}, task.title || task.bvid || '主人请求'),
@@ -989,12 +1121,19 @@ window.__ModuleLoader__.load({
       const [draft, setDraft] = useState(null)
       const [msg, setMsg] = useState('')
       const [busy, setBusy] = useState('')
+      const [dirty, setDirty] = useState(false)
+      useEffect(() => {
+        // 关页面/刷新时也提醒一下，别让改了一半的关键词白填
+        const warn = (e) => { if (!settingsDirty) return; e.preventDefault(); e.returnValue = '' }
+        window.addEventListener('beforeunload', warn)
+        return () => window.removeEventListener('beforeunload', warn)
+      }, [])
 
       useEffect(() => {
         if (cfg && draft === null) {
           setDraft({
             ...cfg,
-            keywordsText: (cfg.keywords || []).join('\n'),
+            keywords: (cfg.keywords || []).map(kwOf),
             modelChainText: (cfg.modelChain || []).join('\n'),
             tagsText: (cfg.defaultTags || []).join(','),
             mentions: (cfg.mentions || []).map((m) => ({ ...m })),
@@ -1003,18 +1142,30 @@ window.__ModuleLoader__.load({
       }, [cfg, draft])
       if (cfgRes.loading || !draft) return h('div', { 'data-wb-loading': '' }, '读设置中…')
 
-      const set = (k, v) => setDraft({ ...draft, [k]: v })
-      const setMention = (i, k, v) => setDraft({
+      /* 所有编辑都从这里过，顺手把「未保存」标出来：切标签/关页面时会被拦一下 */
+      const edit = (next) => { settingsDirty = true; setDirty(true); setDraft(next) }
+      const set = (k, v) => edit({ ...draft, [k]: v })
+      const setMention = (i, k, v) => edit({
         ...draft,
         mentions: (draft.mentions || []).map((m, idx) => (idx === i ? { ...m, [k]: v } : m)),
       })
-      const addMention = () => setDraft({ ...draft, mentions: [...(draft.mentions || []), { target: '', call: '' }] })
-      const delMention = (i) => setDraft({ ...draft, mentions: (draft.mentions || []).filter((_, idx) => idx !== i) })
+      const addMention = () => edit({ ...draft, mentions: [...(draft.mentions || []), { target: '', call: '' }] })
+      const delMention = (i) => edit({ ...draft, mentions: (draft.mentions || []).filter((_, idx) => idx !== i) })
+      const setKw = (i, k, v) => edit({
+        ...draft,
+        keywords: (draft.keywords || []).map((x, idx) => (idx === i ? { ...x, [k]: v } : x)),
+      })
+      const addKw = () => edit({
+        ...draft,
+        keywords: [...(draft.keywords || []), { text: '', kind: 'content', precision: 'loose', weight: 50 }],
+      })
+      const delKw = (i) => edit({ ...draft, keywords: (draft.keywords || []).filter((_, idx) => idx !== i) })
       const save = async () => {
         setBusy('save'); setMsg('保存中…')
         const r = await jpost('/config', {
           enabled: draft.enabled, scheduleRanges: draft.scheduleRanges, perDay: draft.perDay,
-          keywords: String(draft.keywordsText || '').split('\n').map((s) => s.trim()).filter(Boolean),
+          // 空行的待添加条目不落盘；后端只认 { text, kind, precision, weight }
+          keywords: (draft.keywords || []).map((k) => ({ ...k, text: String(k.text || '').trim() })).filter((k) => k.text),
           llmKey: draft.llmKey,
           personaPrompt: draft.personaPrompt, reportLevel: draft.reportLevel, favFolderId: draft.favFolderId,
           memoryEnabled: draft.memoryEnabled !== false,
@@ -1036,7 +1187,8 @@ window.__ModuleLoader__.load({
         setBusy('')
         if (r.ok) {
           setMsg('已保存')
-          setDraft({ ...r.config, keywordsText: (r.config.keywords || []).join('\n'), modelChainText: (r.config.modelChain || []).join('\n'), tagsText: (r.config.defaultTags || []).join(',') })
+          settingsDirty = false; setDirty(false)
+          setDraft({ ...r.config, keywords: (r.config.keywords || []).map(kwOf), modelChainText: (r.config.modelChain || []).join('\n'), tagsText: (r.config.defaultTags || []).join(',') })
           cfgRes.reload(); onSaved?.()
         } else setMsg('保存失败：' + (errText(r) || ''))
       }
@@ -1061,6 +1213,7 @@ window.__ModuleLoader__.load({
         h('div', { 'data-wb-row': '' },
           h(Note, {}, sched.lastRunAt ? `上次：${new Date(sched.lastRunAt).toLocaleString('zh-CN')} · ${sched.lastResult || ''}` : '还没跑过'),
           h('div', { 'data-wb-grow': '' }),
+          dirty ? h('span', { 'data-wb-chip': '', 'data-warn': '' }, '未保存') : null,
           h(Btn, { primary: true, sm: true, disabled: busy === 'save', onClick: save }, busy === 'save' ? '保存中…' : '保存设置'),
           h(Btn, { sm: true, disabled: busy === 'run', onClick: run }, '开始采集'),
           msg ? h('span', { 'data-wb-note': '' }, msg) : null),
@@ -1081,8 +1234,31 @@ window.__ModuleLoader__.load({
 
           h(Sec, { title: '偏好 · 它按什么说话' },
             h('div', { 'data-wb-col': '' },
-              h('div', { 'data-wb-h': '' }, '关注关键词（一行一个；和视频页标签同步，采集时与热门混合）'),
-              h('textarea', { 'data-wb-input': '', 'data-area': '', rows: 4, value: draft.keywordsText, onChange: (e) => set('keywordsText', e.target.value) })),
+              h('div', { 'data-wb-h': '' }, '关注关键词（和视频页标签同步，采集时与热门混合）'),
+              h('div', { 'data-wb-kwlist': '' },
+                (draft.keywords || []).map((k, i) => h('div', { key: i, 'data-wb-kwrow': '' },
+                  h('input', {
+                    'data-wb-input': '', 'aria-label': '关键词', placeholder: '关键词或 UP 名',
+                    value: k.text, onChange: (e) => setKw(i, 'text', e.target.value),
+                  }),
+                  h(Select, { value: k.kind, 'aria-label': '关键词类型', onChange: (e) => setKw(i, 'kind', e.target.value) },
+                    h('option', { value: 'content' }, '内容'),
+                    h('option', { value: 'up' }, 'UP主')),
+                  h(Select, { value: k.precision, 'aria-label': '搜索精度', onChange: (e) => setKw(i, 'precision', e.target.value) },
+                    h('option', { value: 'loose' }, '宽松'),
+                    h('option', { value: 'exact' }, '精确')),
+                  h('label', { 'data-wb-kww': '', title: '权重：定时采集时被抽中的概率' },
+                    h('input', {
+                      type: 'range', min: 0, max: 100, step: 5, value: k.weight, 'aria-label': `权重 ${k.weight}%`,
+                      // 已选区间用品牌粉填充（轨道伪元素读这个变量）
+                      style: { '--wb-fill': k.weight + '%' },
+                      onChange: (e) => setKw(i, 'weight', Number(e.target.value)),
+                    }),
+                    h('span', {}, k.weight + '%')),
+                  h(Btn, { sm: true, onClick: () => delKw(i), 'aria-label': `删除关键词 ${k.text || ''}` }, '删除'))),
+                h('div', { 'data-wb-row': '' },
+                  h(Btn, { sm: true, disabled: (draft.keywords || []).length >= 20, onClick: addKw }, '+ 添加关键词')),
+                h(Note, {}, kwTip))),
             h('div', { 'data-wb-col': '' },
               h('div', { 'data-wb-h': '' }, '人设（判定 / 方案 / 评论都用它）'),
               h('textarea', { 'data-wb-input': '', 'data-area': '', rows: 6, value: draft.personaPrompt || '', onChange: (e) => set('personaPrompt', e.target.value), placeholder: '例：叫我老弟，说话像贴吧老哥，犀利不客气，控制在 40 字内' })),
@@ -1191,7 +1367,8 @@ window.__ModuleLoader__.load({
       const [running, setRunning] = useState(false)
       const [runMsg, setRunMsg] = useState('')
       const cfgRes = useApi('/config')
-      const store = useApi('/store/list?limit=500')
+      // 这里只需要索引（bvid/档位/标题/UP/3 条金句），别再拉整库的热评和帧
+      const store = useApi('/store/list?limit=500&fields=index')
       const storeMap = useMemo(() => {
         const m = {}
         for (const r of (store.data?.rows || [])) {
@@ -1215,7 +1392,7 @@ window.__ModuleLoader__.load({
         cfgRes.reload(); store.reload()
       }
       return h('div', { 'data-wb-page': '' },
-        h(PageHead, { title: sub === 'msg' ? '刷B站 · 消息' : sub === 'set' ? '刷B站 · 设置' : '刷B站', sub: sub === 'msg' ? '未读、回复、@、私信 —— 回复先给草稿' : sub === 'set' ? '管理采集频率、内容偏好与互动权限' : '看视频、挑视频、采集成素材' },
+        h(PageHead, { title: sub === 'msg' ? '刷B站 · 消息' : '刷B站', sub: sub === 'msg' ? '未读、回复、@、私信 —— 回复先给草稿' : '看视频、挑视频、采集成素材' },
           h('span', { 'data-wb-chip': '' }, `今日已采 ${cfgRes.data?.schedule?.todayCount ?? '?'} 条`),
           h(Btn, { sm: true, primary: true, disabled: running, onClick: runRound }, running ? '采集中…' : '开始采集'),
           sub === 'video' ? h(Btn, { sm: true, onClick: () => { cfgRes.reload(); store.reload() } }, '刷新') : null),
@@ -1243,16 +1420,12 @@ window.__ModuleLoader__.load({
       const [msg, setMsg] = useState('')
       const [showShots, setShowShots] = useState(false)
       const [editing, setEditing] = useState(false)
-      const [deleteConfirm, setDeleteConfirm] = useState(false)
+      const [delArm, setDelArm] = useState(false)
+      const delTimer = useRef(null)
+      useEffect(() => () => clearTimeout(delTimer.current), [])
       const [viewV, setViewV] = useState(0)
       const [viewPlan, setViewPlan] = useState(null)
       const [preview, setPreview] = useState('')
-      useEffect(() => {
-        if (!preview) return
-        const close = e => { if (e.key === 'Escape') setPreview('') }
-        window.addEventListener('keydown', close)
-        return () => window.removeEventListener('keydown', close)
-      }, [preview])
       const [logOpen, setLogOpen] = useState(false)
       const plan = viewV ? (viewPlan || p.plan) : p.plan
       const job = p.job
@@ -1303,10 +1476,19 @@ window.__ModuleLoader__.load({
       }
       const remove = async () => {
         if (busy === 'del') return
+        // 两步确认：第一次点只变红，4 秒内再点才真删（与「删除成片」「删除条目」同一套口径）
+        if (!delArm) {
+          setDelArm(true)
+          clearTimeout(delTimer.current)
+          delTimer.current = setTimeout(() => setDelArm(false), 4000)
+          return
+        }
+        clearTimeout(delTimer.current)
+        setDelArm(false)
         setBusy('del'); setMsg('删除中…')
         const r = await jpost('/create/delete', { id: p.id })
         setBusy('')
-        if (r.ok) { setDeleteConfirm(false); onDeleted?.(p.id); onChange?.() }
+        if (r.ok) { onDeleted?.(p.id); onChange?.() }
         else setMsg('删除失败：' + (errText(r) || '服务端未完成删除，请刷新后重试'))
       }
 
@@ -1341,12 +1523,11 @@ window.__ModuleLoader__.load({
           h(Btn, { sm: true, 'aria-expanded': showShots, onClick: () => setShowShots(!showShots) }, showShots ? '收起分镜' : '查看分镜'),
           h('div', { 'data-wb-grow': '' }),
           job?.log ? h(Btn, { sm: true, onClick: () => setLogOpen(!logOpen) }, logOpen ? '收起日志' : '渲染日志') : null,
-          h(Btn, { sm: true, disabled: Boolean(busy) || job?.stage === 'running', onClick: () => { setDeleteConfirm(true); setMsg('') }, 'data-wb-danger-link': '' }, '删除方案')),
-        deleteConfirm ? h('div', { 'data-wb-delete-confirm': '', role: 'alert', 'aria-label': '删除方案确认' },
-          h('div', {}, h('b', {}, '确认删除这个方案？'), h('div', { 'data-wb-note': '' }, '包含所有历史版本；已渲染的成片会保留。')),
-          h('div', { 'data-wb-row': '' },
-            h(Btn, { sm: true, disabled: Boolean(busy), onClick: () => setDeleteConfirm(false) }, '取消'),
-            h(Btn, { sm: true, disabled: Boolean(busy), 'data-wb-danger': '', onClick: remove }, busy === 'del' ? '删除中…' : '确认删除方案'))) : null,
+          h(Btn, {
+            sm: true, disabled: Boolean(busy) || job?.stage === 'running', onClick: remove,
+            'data-wb-danger-link': '', 'data-arm': delArm ? '' : undefined,
+            title: '删除方案会清掉所有历史版本；已渲染的成片保留在「成片投稿」',
+          }, busy === 'del' ? '删除中…' : delArm ? '确认删除方案？' : '删除方案')),
         showShots ? h('div', { 'data-wb-col': '' }, ...shots.map((s, i) => h('div', { key: i, 'data-wb-quote': '' },
           h('b', {}, `${i + 1}. ${shotNames[s.kind] || s.kind}`), ' ', s.headline || '', s.body ? ` — ${s.body}` : '',
           h('div', { 'data-wb-meta': '', style: { marginTop: '3px' } },
@@ -1354,8 +1535,7 @@ window.__ModuleLoader__.load({
         msg ? (/失败|错误/.test(msg) ? h(Err, {}, msg) : h(Note, {}, msg)) : null,
         job?.stage === 'failed' ? h(Err, {}, job.error || '渲染失败，请重新尝试') : null,
         logOpen && job?.log ? h('pre', { 'data-wb-pre': '' }, job.log.slice(-2600)) : null,
-        preview ? h('div', { 'data-wb-overlay': '', role: 'dialog', 'aria-modal': true, 'aria-label': '成片预览', onClick: e => { if (e.target === e.currentTarget) setPreview('') } },
-          h('button', { className: 'x', 'aria-label': '关闭预览（Esc）', onClick: () => setPreview('') }, '✕'),
+        preview ? h(Overlay, { label: '成片预览', onClose: () => setPreview('') },
           h('video', { src: preview, controls: true, autoPlay: true })) : null)
     }
 
@@ -1435,8 +1615,18 @@ window.__ModuleLoader__.load({
       const taskRows = taskList.data?.tasks || []
       const activeTasks = taskRows.filter((t) => ['queued', 'checking', 'collecting', 'planning'].includes(t.status)).length
       const anyRunning = projects.some((p) => p.job?.stage === 'running')
-      usePoll(list.reload, 4000, true)
-      usePoll(taskList.reload, 4000, true)
+      // 有任务/渲染时 4 秒一看；空闲时放慢，别一直敲后端
+      const live = activeTasks > 0 || anyRunning
+      usePoll(list.reload, live ? 4000 : 20000, true)
+      usePoll(taskList.reload, live ? 4000 : 20000, true)
+      const [pf, setPf] = useState('all')
+      const planBuckets = {
+        all: () => true,
+        live: (p) => p.job?.stage === 'running' || p.stage === 'rendering',
+        todo: (p) => !p.stage || ['draft', 'scripted'].includes(p.stage),
+        done: (p) => ['rendered', 'approved', 'rejected', 'submitted', 'published', 'platform_rejected', 'uploading', 'upload_unknown'].includes(p.stage),
+      }
+      const shownProjects = projects.filter(planBuckets[pf])
 
       const go = async () => {
         if (!brief.trim()) return
@@ -1468,6 +1658,11 @@ window.__ModuleLoader__.load({
           h('div', { 'data-wb-col': '' }, ...taskRows.map((t) => h(TaskCard, {
             key: t.id, t, onChange: () => { taskList.reload(); list.reload() },
           })))) : null,
+        h('div', { 'data-wb-row': '', 'aria-label': '方案状态筛选' },
+          ...[['all', '全部'], ['live', '渲染中'], ['todo', '待渲染'], ['done', '已出片']].map(([k, name]) =>
+            h(Btn, {
+              key: k, sm: true, primary: pf === k, 'aria-pressed': pf === k, onClick: () => setPf(k),
+            }, `${name} ${projects.filter(planBuckets[k]).length}`))),
         h('div', { 'data-wb-row': '' },
           h(Note, {}, `共 ${projects.length} 个方案${anyRunning ? ' · 有项目在渲染' : ''}`),
           h('div', { 'data-wb-grow': '' }),
@@ -1480,9 +1675,11 @@ window.__ModuleLoader__.load({
           title: '还没有方案',
           hint: '在上面写一句需求，点「生成方案」。素材不够时它会自己去「刷B站」找。',
         }) : null,
-        h('div', { 'data-wb-col': '' }, ...projects.map((p) => h(ProjectCard, {
-          key: p.id, p, onChange: list.reload, onDeleted: id => { setDeletedIds(ids => [...ids, id]); taskList.reload() },
-        }))),
+        !list.loading && projects.length > 0 && !shownProjects.length ? h(Empty, { title: '这个状态没有方案', hint: '换个筛选看看。' }) : null,
+        h('div', { 'data-wb-col': '' },
+          h(Fold, { limit: 6, unit: '个方案' }, ...shownProjects.map((p) => h(ProjectCard, {
+            key: p.id, p, onChange: list.reload, onDeleted: id => { setDeletedIds(ids => [...ids, id]); taskList.reload() },
+          })))),
         h(Note, {}, '音色、时长等出片设置可在「刷B站设置」调整。'))
     }
 
@@ -1492,16 +1689,10 @@ window.__ModuleLoader__.load({
       const [busy, setBusy] = useState('')
       const [dump, setDump] = useState('')
       const [preview, setPreview] = useState('')
-      useEffect(() => {
-        if (!preview) return
-        const close = e => { if (e.key === 'Escape') setPreview('') }
-        window.addEventListener('keydown', close)
-        return () => window.removeEventListener('keydown', close)
-      }, [preview])
       const [delArm, setDelArm] = useState('')
       const delTimer = useRef(null)
       useEffect(() => () => clearTimeout(delTimer.current), [])
-      const [filter, setFilter] = useState('all')
+      const [filter, setFilter] = useState('')
       const runs = list.data?.runs || []
       const groups = {
         all: () => true,
@@ -1509,7 +1700,10 @@ window.__ModuleLoader__.load({
         approved: r => r.stage === 'approved',
         submitted: r => ['submitted', 'published', 'platform_rejected', 'uploading', 'upload_unknown'].includes(r.stage),
       }
-      const visibleRuns = runs.filter(groups[filter] || groups.all)
+      /* 默认落在待处理的桶：有东西待审就只看待审，没有才退回全部，避免第一次进来遇到一片「暂无」。
+         下面的分组才是「按状态区分」，这排按钮只决定看哪些阶段。 */
+      const activeFilter = filter || (runs.some(groups.pending) ? 'pending' : 'all')
+      const visibleRuns = runs.filter(groups[activeFilter])
       const publishEnabled = Boolean(list.data?.publishEnabled)
       usePoll(list.reload, 5000, true)
 
@@ -1545,7 +1739,7 @@ window.__ModuleLoader__.load({
               h(Btn, { sm: true, disabled: !r.hasVideo, onClick: () => setPreview(`/api/bili-wb/review/media?runId=${encodeURIComponent(r.runId)}&kind=video`) }, '预览'),
               h(Btn, {
                 sm: true, disabled: Boolean(busy), onClick: () => remove(r),
-                style: delArm === r.runId ? { color: '#f87171', borderColor: 'rgba(248,113,113,.5)' } : undefined,
+                'data-arm': delArm === r.runId ? '' : undefined,
               }, busy === r.runId + 'del' ? '删除中…' : delArm === r.runId ? '确认删除？' : '删除成片')),
             h('div', { 'data-wb-row': '' },
               h(Btn, { sm: true, disabled: Boolean(busy) || !r.hasVideo || r.stage === 'uploading', onClick: () => upload(r, true) }, '投稿检查'),
@@ -1636,12 +1830,11 @@ window.__ModuleLoader__.load({
         }) : null,
         h('div', { 'data-wb-row': '', 'aria-label': '成片状态筛选' },
           ...[['all', '全部'], ['pending', '待本地审核'], ['approved', '待投稿'], ['submitted', '投稿记录']].map(([key, name]) =>
-            h(Btn, { key, sm: true, primary: filter === key, 'aria-pressed': filter === key, onClick: () => setFilter(key) }, name + ' ' + runs.filter(groups[key]).length))),
+            h(Btn, { key, sm: true, primary: activeFilter === key, 'aria-pressed': activeFilter === key, onClick: () => setFilter(key) }, name + ' ' + runs.filter(groups[key]).length))),
         !list.loading && runs.length > 0 && !visibleRuns.length ? h(Empty, { title: '此状态暂无成片', hint: '可以切换其他状态查看。' }) : null,
         ...sections.map((g) => sectionEl(g.stage, g.items)),
         strayRuns.length ? sectionEl('未知状态', strayRuns) : null,
-        preview ? h('div', { 'data-wb-overlay': '', role: 'dialog', 'aria-modal': true, 'aria-label': '成片预览', onClick: e => { if (e.target === e.currentTarget) setPreview('') } },
-          h('button', { className: 'x', 'aria-label': '关闭预览（Esc）', onClick: () => setPreview('') }, '✕'),
+        preview ? h(Overlay, { label: '成片预览', onClose: () => setPreview('') },
           h('video', { src: preview, controls: true, autoPlay: true })) : null)
     }
 
@@ -1651,6 +1844,9 @@ window.__ModuleLoader__.load({
       const [inputs, setInputs] = useState({ user: '', memory: '' })
       const [busy, setBusy] = useState('')
       const [msg, setMsg] = useState('')
+      const [delArm, setDelArm] = useState('')
+      const delTimer = useRef(null)
+      useEffect(() => () => clearTimeout(delTimer.current), [])
       const cfgRes = useApi('/config')
       const cfg = cfgRes.data?.config
 
@@ -1688,21 +1884,40 @@ window.__ModuleLoader__.load({
         refresh()
       }
       const evIcon = { watched: '观看', plan: '方案', 'plan-revise': '改版', render: '渲染', review: '审核', comment: '评论', reply: '回复', dm: '私信', publish: '投稿', task: '任务', remember: '记忆' }
+      /* 删条目也走两步确认：第一次点变红，4 秒内再点才真删（与「删除成片」同一套口径） */
+      const removeEntry = async (key, text) => {
+        const armKey = key + '|' + text
+        if (delArm !== armKey) {
+          setDelArm(armKey)
+          clearTimeout(delTimer.current)
+          delTimer.current = setTimeout(() => setDelArm(''), 4000)
+          return
+        }
+        clearTimeout(delTimer.current)
+        setDelArm('')
+        await op({ target: key, action: 'remove', old_text: text }, '已删')
+      }
       const pendings = data?.pending || []
       const events = data?.events || { count: 0, types: {}, recent: [] }
 
       const col = (key, title, hint) => {
         const t = data?.[key]
-        const entryEls = (t?.entries || []).map((e, i) => h('div', {
-          key: i, 'data-wb-row': '',
-          style: e.blocked ? { color: '#ef4444', borderBottom: '1px dashed #ef4444', padding: '2px 0' } : { borderBottom: '1px solid rgba(128,128,128,.2)', padding: '2px 0' },
-          title: e.blocked ? `已屏蔽：${e.blockedWhy}（磁盘原文保留）` : `${e.source || ''} ${e.at ? '· ' + e.at.slice(0, 10) : ''}`,
-        },
-        h('span', { style: { flex: '1', minWidth: '0' } }, e.blocked ? `⛔ ${e.text}` : e.text),
-        h('button', {
-          'data-wb-ghost': '', style: { width: 'auto', border: 'none', background: 'none', cursor: 'pointer', color: '#999' },
-          title: '删除这条', onClick: () => op({ target: key, action: 'remove', old_text: e.text }, '已删'),
-        }, '×')))
+        const entryEls = (t?.entries || []).map((e, i) => {
+          const arm = delArm === key + '|' + e.text
+          return h('div', {
+            key: i, 'data-wb-row': '',
+            style: e.blocked
+              ? { color: 'var(--wb-danger-text)', borderBottom: '1px dashed var(--wb-danger-text)', padding: '2px 0' }
+              : { borderBottom: '1px solid var(--wb-line)', padding: '2px 0' },
+            title: e.blocked ? `已屏蔽：${e.blockedWhy}（磁盘原文保留）` : `${e.source || ''} ${e.at ? '· ' + e.at.slice(0, 10) : ''}`,
+          },
+          h('span', { style: { flex: '1', minWidth: '0' } }, e.blocked ? `⛔ ${e.text}` : e.text),
+          h('button', {
+            'data-wb-ghost': '', 'aria-label': arm ? '再点一次确认删除' : '删除这条',
+            style: { width: 'auto', border: 'none', background: 'none', cursor: 'pointer', color: arm ? 'var(--wb-danger-text)' : 'var(--wb-dim)' },
+            title: arm ? '再点一次就删除' : '删除这条', onClick: () => removeEntry(key, e.text),
+          }, arm ? '确认删除？' : '×'))
+        })
         return h('div', { 'data-wb-col': '', style: { minWidth: '0' } },
           h('div', { 'data-wb-row': '' },
             h('b', {}, title),
@@ -1754,12 +1969,12 @@ window.__ModuleLoader__.load({
         h('div', { style: { display: 'flex', flexDirection: 'column', gap: '2px', marginTop: '4px' } },
           h(Fold, { limit: 5, unit: '条' },
             (events.recent || []).map((e, i) => h('div', {
-              key: i, 'data-wb-row': '', style: { borderBottom: '1px solid rgba(128,128,128,.15)', padding: '2px 0' },
+              key: i, 'data-wb-row': '', style: { borderBottom: '1px solid var(--wb-line)', padding: '2px 0' },
               title: `${e.at} · ${e.type}`,
             },
             h('span', { style: { marginRight: '6px' } }, evIcon[e.type] || '·'),
             h('span', { 'data-wb-grow': '', style: { minWidth: '0' } }, String(e.text || '').slice(0, 70)),
-            h('span', { style: { color: '#999', fontSize: '12px' } }, String(e.at || '').slice(5, 10)))))),
+            h('span', { style: { color: 'var(--wb-dim2)', fontSize: 'var(--wb-fs-xs)' } }, String(e.at || '').slice(5, 10)))))),
         !events.recent?.length ? h(Note, {}, '（还没有经历，刷几条 B站 或出一个方案就有了）') : null,
         /* ── 复盘（M2）：从经历里提炼跨次有效的偏好 ── */
         h('div', { 'data-wb-row': '', style: { marginTop: '8px' } },
@@ -1972,20 +2187,46 @@ window.__ModuleLoader__.load({
           }
           return null
         }
-        const seatOf = (scroll) => scroll?.querySelector('[class*="composerSeat"]') || null
+        /* 工作台是 conversation.view 的一个标签页，底部的输入座位和宽度拖拽把手由宿主按「整个会话」
+           渲染，切标签不会消失。挂载期间在会话区域上打标记，让 CSS 把这两个宿主 UI 藏掉；
+           工作台卸载（切回对话标签）时移除标记，输入框自己回来。 */
+        /* 多会话并排时不能盲选第一个 region，要取同时包住工作台和输入座位的最近祖先 */
+        const chatRegion = (() => {
+          const named = root.closest('[data-conversation-region="chat"]')
+          if (named) return named
+          let el = root.parentElement
+          while (el && !el.querySelector('[data-composer-seat]')) el = el.parentElement
+          return el
+        })()
+        chatRegion?.setAttribute('data-wb-view', '')
+        const seatOf = () => {
+          const region = chatRegion || document
+          return region.querySelector('[data-composer-seat]') || region.querySelector('[class*="composerSeat"]')
+        }
         let seat = null
+        const ro = new ResizeObserver(() => fit())
         const fit = () => {
           const scroll = findScroll()
           if (!scroll) return
-          seat = seatOf(scroll)
-          const seatH = seat ? seat.offsetHeight : 0
-          const avail = Math.max(320, scroll.clientHeight - seatH)
+          const next = seatOf()
+          if (next !== seat) {
+            if (seat) ro.unobserve(seat)
+            seat = next
+            if (seat) ro.observe(seat)
+          }
+          // 只扣掉座位真正压在滚动区里的那一截：座位在区外由宿主自己排版，再扣就多减了
+          let covered = 0
+          if (seat) {
+            const sr = scroll.getBoundingClientRect()
+            const cr = seat.getBoundingClientRect()
+            covered = Math.max(0, Math.min(sr.bottom, cr.bottom) - Math.max(sr.top, cr.top))
+          }
+          const avail = Math.max(320, Math.round(scroll.clientHeight - covered))
           root.style.height = avail + 'px'
           root.style.maxHeight = avail + 'px'
           root.style.minHeight = '0px'
         }
         fit()
-        const ro = new ResizeObserver(() => fit())
         ro.observe(document.documentElement)
         const scroll = findScroll()
         if (scroll) ro.observe(scroll)
@@ -1994,15 +2235,23 @@ window.__ModuleLoader__.load({
         const t = setTimeout(fit, 500)
         // 宿主切换会话 / 输入框变高时，再量一次
         const iv = setInterval(fit, 1500)
-        return () => { clearTimeout(t); clearInterval(iv); ro.disconnect(); window.removeEventListener('resize', fit) }
+        return () => {
+          clearTimeout(t); clearInterval(iv); ro.disconnect(); window.removeEventListener('resize', fit)
+          chatRegion?.removeAttribute('data-wb-view')
+        }
       }, [])
       return h('div', { 'data-wb-root': '', 'data-collapsed': collapsed ? '' : undefined, ref: rootRef },
         h('aside', { 'data-wb-rail': '' },
           h('div', { 'data-wb-brand': '' }, 'B站工作台', h('small', {}, '素材 → 出片 → 发布')),
           h('nav', { style: { display: 'flex', flexDirection: 'column' } },
             ...NAV.map(([k, ico, label]) => h('button', {
-              key: k, 'data-wb-nav': '', 'aria-label': label, title: label, 'aria-selected': tab === k ? 'true' : 'false',
-              onClick: () => setTab(k),
+              key: k, 'data-wb-nav': '', 'aria-label': label, title: label,
+              'aria-current': tab === k ? 'page' : undefined,
+              onClick: () => {
+                if (k === tab) return
+                if (tab === 'settings' && settingsDirty && !window.confirm('「刷B站设置」还有未保存的改动，确定离开？')) return
+                setTab(k)
+              },
             },
             h('span', { className: 'ico' }, h(Icon, { name: ico })),
             h('span', { 'data-wb-label': '' }, label)))),
